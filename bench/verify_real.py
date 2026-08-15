@@ -33,7 +33,7 @@ if str(ROOT) not in sys.path:
 
 from groundextract.adapters import DoclingAdapter  # noqa: E402
 from groundextract.gate import run_gate, summarize  # noqa: E402
-from groundextract.llm.openweight import OllamaExtractor  # noqa: E402
+from groundextract.llm.openweight import DEFAULT_HOST, OllamaExtractor  # noqa: E402
 from groundextract.models import ExtractedValue, Verdict  # noqa: E402
 from groundextract.rules import load_rule_pack  # noqa: E402
 
@@ -44,7 +44,8 @@ RULES = ROOT / "rules" / "tax_invoice.yaml"
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="qwen2.5:7b", help="Ollama model tag")
-    ap.add_argument("--host", default="http://localhost:11434")
+    ap.add_argument("--host", default=DEFAULT_HOST,
+                    help="Ollama server URL (defaults to $OLLAMA_HOST, else localhost:11434)")
     args = ap.parse_args()
 
     # -- 1. Docling: PDF -> text + layout ---------------------------------------

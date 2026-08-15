@@ -37,6 +37,7 @@ Apache-2.0.
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 import urllib.request
 from typing import Any
@@ -44,7 +45,20 @@ from typing import Any
 from ..grounding import normalize_number_str
 from ..models import ExtractedValue
 
-DEFAULT_HOST = "http://localhost:11434"
+
+def _default_host() -> str:
+    """Honour Ollama's own ``OLLAMA_HOST`` convention.
+
+    Accepts the bare ``host:port`` form the Ollama CLI uses as well as a full
+    URL, so the same value works for both `ollama serve` and this client.
+    """
+    raw = os.environ.get("OLLAMA_HOST", "").strip()
+    if not raw:
+        return "http://localhost:11434"
+    return raw if raw.startswith(("http://", "https://")) else f"http://{raw}"
+
+
+DEFAULT_HOST = _default_host()
 # Apache-2.0 size. Do NOT default to qwen2.5:3b / :72b — those are
 # Qwen-Research (non-commercial). See the module docstring.
 DEFAULT_MODEL = "qwen2.5:7b"
