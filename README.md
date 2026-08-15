@@ -343,6 +343,11 @@ Read these before trusting the gate in production:
 - **Rules are arithmetic, not semantic.** The gate verifies that numbers are consistent
   and present. It does not verify that the counterparty, date, or account classification
   is correct.
+- **The EXACT grounding tier has no token boundary.** It is a substring test, so
+  `match_value("1,234", "합계 21,234원")` grounds, and an unsigned value can ground against
+  a negative figure written as `△1,234`. The numeric tiers below it are boundary-aware;
+  this one is not yet. Per [SECURITY.md](SECURITY.md) a gate bypass is our highest-severity
+  class, so it is disclosed here rather than left to be discovered.
 - **Unit scaling is not handled yet.** Statements printed in 천원/백만원 units are not
   rescaled before rule evaluation.
 - **`balance_sheet` is not yet in the benchmark.** Its rule pack, viewer fixture, and unit
