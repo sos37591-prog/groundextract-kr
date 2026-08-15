@@ -1,0 +1,90 @@
+name: Feature request
+description: Propose a change to how the gate works, or a new capability
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Requesting support for a **new document type**? Use the
+        [Rule pack request](https://github.com/sos37591-prog/groundextract-kr/issues/new?template=rule_pack_request.yml)
+        template instead — it asks the right questions.
+
+        Two things shape what gets merged here:
+
+        - **Recall is the product.** A change that lets a wrong number through to
+          `verified` will not be accepted, however much precision it buys.
+        - **One runtime dependency.** PyYAML is the whole runtime dependency list.
+          Anything heavier has to live in an optional extra and be imported lazily.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What goes wrong today? Concrete situations beat abstract wishes.
+      placeholder: |
+        When a statement is printed in 천원 units, every arithmetic rule fires a false
+        violation, so a clean document comes out fully discarded.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should happen instead? Sketch the API or behavior if you can.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - grounding (verbatim matching)
+        - rules (rule engine expressiveness)
+        - gate (verdicts, confidence, fault localization)
+        - bench (metrics, golden set)
+        - mcp_server (tools, schema)
+        - llm / adapters
+        - viewer
+        - packaging / CI / docs
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Effect on the benchmark
+      description: Your best guess. We report precision and recall movements in the open.
+      options:
+        - No effect on verdicts (tooling, docs, performance)
+        - Improves precision, recall unchanged at 100%
+        - Improves recall coverage (catches a class of error we currently miss)
+        - Trades recall for something else (needs strong justification)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Including "why not just do it outside the gate?"
+
+  - type: input
+    id: deps
+    attributes:
+      label: New dependencies required
+      description: Name them, or write "none". Runtime dependencies beyond PyYAML are very unlikely to be accepted.
+      placeholder: "none"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Participation
+      options:
+        - label: I am willing to open a pull request for this
+        - label: I would like to discuss the design first

@@ -1,0 +1,108 @@
+name: Bug report
+description: A wrong verdict, a crash, or anything that does not behave as documented
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report.
+
+        **Before you file:** if a *wrong number came out `verified`* (a gate bypass /
+        false negative), please do not open a public issue — report it privately via
+        [Security Advisory](https://github.com/sos37591-prog/groundextract-kr/security/advisories/new)
+        so the fix can ship before the technique is public. See [SECURITY.md](https://github.com/sos37591-prog/groundextract-kr/blob/main/SECURITY.md).
+
+        **Never paste real documents.** No real tax invoices, financial statements,
+        registration numbers, or personal data — reproduce with synthetic text.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: This is not a gate bypass (a hallucinated value coming out `verified`) — those go to Security Advisories
+          required: true
+        - label: My reproduction uses synthetic data only, with no real personal or corporate information
+          required: true
+        - label: I searched existing issues and did not find a duplicate
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - grounding (verbatim matching)
+        - rules (arithmetic rule engine / rule packs)
+        - gate (verdicts, confidence, sibling discard)
+        - bench (NumHall-KR, golden set generator)
+        - mcp_server
+        - llm / adapters (Ollama, Docling)
+        - viewer
+        - packaging / CI / docs
+        - not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you observed, and what you expected instead.
+      placeholder: |
+        `total` came out verified=... but I expected ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: |
+        The smallest self-contained snippet that shows the problem — document text,
+        extracted values, and `doc_type`. Synthetic data only.
+      render: python
+      value: |
+        from groundextract import ExtractedValue, load_rule_pack, run_gate
+
+        doc = "공급가액 1,000,000원\n세액 100,000원\n합계금액 1,100,000원"
+        pack = load_rule_pack("rules/tax_invoice.yaml")
+        values = [
+            ExtractedValue("supply", "1,000,000원", 1_000_000, "공급가액 1,000,000원"),
+        ]
+        for f in run_gate(values, doc, pack):
+            print(f.field, f.verdict.value, f.confidence, [c.detail for c in f.failed_checks])
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Actual output
+      description: Full traceback, or the verdicts and failed checks you got.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: "`python -c \"import groundextract; print(groundextract.__version__)\"`, or the commit SHA."
+      placeholder: "0.1.0 (or commit 5aeff8b)"
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: Python and OS
+      description: "`python -V` and your operating system."
+      placeholder: "Python 3.11.9 / Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Optional context — related issues, why the input is realistic, a suggested fix.

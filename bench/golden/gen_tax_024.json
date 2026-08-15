@@ -1,0 +1,32 @@
+{
+  "doc_id": "gen_tax_024",
+  "doc_type": "tax_invoice",
+  "full_text": "전자세금계산서\n승인번호: 20260314-51373735-58942697\n작성일자: 2026-03-14\n공급자: 동성물산 주식회사 (등록번호 915-15-56898)\n공급받는자: 주식회사 한빛상사 (등록번호 315-97-42706)\n\n품목: 시스템 유지보수\n\n공급가액  36,310,000원\n세액  3,631,000원\n합계금액  39,941,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "vat"
+  },
+  "fields": [
+    {
+      "field": "supply",
+      "raw": "36,310,000원",
+      "number": 36310000,
+      "grounding_quote": "공급가액  36,310,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "vat",
+      "raw": "54,643,049원",
+      "number": 54643049,
+      "grounding_quote": "세액  54,643,049원",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "total",
+      "raw": "39,941,000원",
+      "number": 39941000,
+      "grounding_quote": "합계금액  39,941,000원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

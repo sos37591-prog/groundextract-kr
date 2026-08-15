@@ -1,0 +1,22 @@
+{
+  "doc_id": "gen_stmt_002",
+  "doc_type": "statement",
+  "full_text": "합계잔액시산표\n주식회사 한빛상사  2026년 01월 08일 현재\n(단위: 원)\n\n계정과목  차변  대변\n소모품비  차변 9,300,000원\n외상매출금  차변 13,441,000원\n미지급금  대변 3,061,000원\n선수금  대변 4,636,000원\n단기차입금  대변 15,044,000원\n\n차변 합계  22,741,000원\n대변 합계  22,741,000원\n",
+  "injected_error": null,
+  "fields": [
+    {
+      "field": "debit_total",
+      "raw": "22,741,000원",
+      "number": 22741000,
+      "grounding_quote": "차변 합계  22,741,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "credit_total",
+      "raw": "22,741,000원",
+      "number": 22741000,
+      "grounding_quote": "대변 합계  22,741,000원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

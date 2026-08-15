@@ -1,0 +1,105 @@
+name: Rule pack request (new document type)
+description: Ask for — or propose — arithmetic invariants for a document type we don't support yet
+title: "rules: <document type>"
+labels: ["rule-pack", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A rule pack is how this project grows. It is one YAML file listing the
+        arithmetic identities a document type must satisfy, plus three registrations
+        (rule pack → extractor field specs → MCP doc-type enum). See
+        [CONTRIBUTING.md](https://github.com/sos37591-prog/groundextract-kr/blob/main/CONTRIBUTING.md#adding-a-rule-pack-new-document-type).
+
+        You do **not** need to know Python to file this. Domain knowledge — *which
+        numbers on this form must add up to which other numbers* — is the part we
+        cannot look up, and it is what makes a rule pack worth having.
+
+        Currently supported: `tax_invoice`, `statement` (trial balance),
+        `balance_sheet`.
+
+        **Do not attach a real document.** Retype the layout with made-up numbers.
+
+  - type: input
+    id: doc-type
+    attributes:
+      label: Document type
+      description: Korean name and the proposed `doc_type` identifier (snake_case, ASCII).
+      placeholder: "급여명세서 (payslip) → payslip"
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this document type
+      description: |
+        Who processes it, at what volume, and what goes wrong when a number is wrong?
+        A wrong number that someone eventually pays for is the strongest case.
+      placeholder: |
+        Payslips are re-keyed into payroll every month; a misread deduction is only
+        caught at year-end settlement, if at all.
+    validations:
+      required: true
+
+  - type: textarea
+    id: fields
+    attributes:
+      label: Fields to extract
+      description: >-
+        One per line as `field_name: 한국어 라벨 (English gloss)`. Field names are
+        ASCII snake_case and are what the rules reference.
+      render: text
+      value: |
+        gross_pay: 지급총액 (gross pay)
+        total_deductions: 공제총액 (total deductions)
+        net_pay: 실지급액 (net pay)
+
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Arithmetic invariants
+      description: |
+        The identities that must hold. Plain arithmetic is fine — someone can translate
+        it into YAML. Note any legal rounding tolerance (`tol`), since Korean forms
+        often round to the won.
+      render: text
+      value: |
+        net_pay = gross_pay - total_deductions        (tol 1 KRW)
+        gross_pay = sum of allowance line items       (tol 1 KRW)
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: Synthetic sample document
+      description: |
+        Retype the layout as plain text with **made-up** numbers that satisfy the
+        invariants above. This becomes the test fixture — it is the single most useful
+        thing you can attach.
+      render: text
+      placeholder: |
+        급여명세서
+        지급총액   3,500,000원
+        공제총액     420,000원
+        실지급액   3,080,000원
+    validations:
+      required: true
+
+  - type: textarea
+    id: pitfalls
+    attributes:
+      label: Formatting pitfalls
+      description: |
+        Negative sign conventions (△, parentheses), unit headers (단위: 천원), full-width
+        digits, values split across columns, subtotals that legitimately do not add up.
+      placeholder: "Amounts are printed in 천원 units; deductions use △ for negatives."
+
+  - type: checkboxes
+    id: participation
+    attributes:
+      label: Participation
+      options:
+        - label: I can write the YAML rule pack and the test myself
+        - label: I can review a rule pack someone else writes, as a domain expert
+        - label: I confirm the sample above is synthetic and contains no real personal or corporate data
+          required: true

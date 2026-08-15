@@ -1,0 +1,46 @@
+{
+  "doc_id": "gen_tax_013",
+  "doc_type": "tax_invoice",
+  "full_text": "전자세금계산서\n승인번호: 20260404-57553014-66851760\n작성일자: 2026-04-04\n공급자: (주)미래유통 (등록번호 520-69-17100)\n공급받는자: 한결시스템 주식회사 (등록번호 789-93-94696)\n\n품목: 소프트웨어 개발  공급가액 3,225,000원  세액 322,500원\n품목: 네트워크 공사  공급가액 23,552,000원  세액 2,355,200원\n\n공급가액  26,777,000원\n세액  2,677,700원\n합계금액  29,454,700원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "total"
+  },
+  "fields": [
+    {
+      "field": "supply",
+      "raw": "26,777,000원",
+      "number": 26777000,
+      "grounding_quote": "공급가액  26,777,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "vat",
+      "raw": "2,677,700원",
+      "number": 2677700,
+      "grounding_quote": "세액  2,677,700원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total",
+      "raw": "14,422,000원",
+      "number": 14422000,
+      "grounding_quote": "합계금액  14,422,000원",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "item1_supply",
+      "raw": "3,225,000원",
+      "number": 3225000,
+      "grounding_quote": "품목: 소프트웨어 개발  공급가액 3,225,000원  세액 322,500원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "item2_supply",
+      "raw": "23,552,000원",
+      "number": 23552000,
+      "grounding_quote": "품목: 네트워크 공사  공급가액 23,552,000원  세액 2,355,200원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

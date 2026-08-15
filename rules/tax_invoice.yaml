@@ -1,0 +1,31 @@
+# Tax invoice (세금계산서) arithmetic rule pack.
+# Field names must match ExtractedValue.field produced by the extractor.
+#
+# Semantics of a rule:
+#   equals: |lhs - rhs| <= tol
+#   sum:    |target - sum(items)| <= tol
+# tol is in the value's unit (KRW), so a 1-won rounding slack is fine.
+
+doc_type: tax_invoice
+
+rules:
+  # 부가세 = 공급가액 × 10%
+  - name: vat_equals_supply_x_10pct
+    type: equals
+    lhs: {field: vat}
+    rhs: {expr: "supply * 0.10"}
+    tol: 1.0
+
+  # 합계금액 = 공급가액 + 세액
+  - name: total_equals_supply_plus_vat
+    type: equals
+    lhs: {field: total}
+    rhs: {expr: "supply + vat"}
+    tol: 1.0
+
+  # 공급가액 = ∑(품목 공급가) — 품목이 추출된 경우에만 적용됨
+  - name: supply_equals_sum_of_items
+    type: sum
+    target: supply
+    items: [item1_supply, item2_supply]
+    tol: 1.0

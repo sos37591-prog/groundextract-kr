@@ -1,0 +1,25 @@
+{
+  "doc_id": "gen_stmt_008",
+  "doc_type": "statement",
+  "full_text": "합계잔액시산표\n(주)누리상사  2026년 04월 09일 현재\n(단위: 원)\n\n계정과목  차변  대변\n지급수수료  차변 387,000원\n미수금  차변 22,666,000원\n비품  차변 27,304,000원\n선수금  대변 25,559,000원\n단기차입금  대변 23,821,000원\n미지급금  대변 977,000원\n\n차변 합계  50,357,000원\n대변 합계  50,357,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "credit_total"
+  },
+  "fields": [
+    {
+      "field": "debit_total",
+      "raw": "50,357,000원",
+      "number": 50357000,
+      "grounding_quote": "차변 합계  50,357,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "credit_total",
+      "raw": "51,068,000원",
+      "number": 51068000,
+      "grounding_quote": "대변 합계  51,068,000원",
+      "expected_verdict": "discarded"
+    }
+  ]
+}

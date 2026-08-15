@@ -1,0 +1,27 @@
+# Balance sheet (재무상태표) arithmetic rule pack.
+# Rich cross-field invariants — the kind a human eye and OCR alone cannot verify,
+# where a single misread/hallucinated figure silently breaks the whole statement.
+
+doc_type: balance_sheet
+
+rules:
+  # 대차평형: 자산총계 = 부채와자본총계
+  - name: balance_assets_eq_liab_equity
+    type: equals
+    lhs: {field: total_assets}
+    rhs: {field: total_liab_equity}
+    tol: 1.0
+
+  # 자산총계 = 유동자산 + 비유동자산
+  - name: assets_eq_current_plus_noncurrent
+    type: sum
+    target: total_assets
+    items: [current_assets, noncurrent_assets]
+    tol: 1.0
+
+  # 부채와자본총계 = 부채총계 + 자본총계
+  - name: liab_equity_eq_liab_plus_equity
+    type: sum
+    target: total_liab_equity
+    items: [total_liabilities, total_equity]
+    tol: 1.0

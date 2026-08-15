@@ -1,0 +1,29 @@
+{
+  "doc_id": "gen_tax_021",
+  "doc_type": "tax_invoice",
+  "full_text": "전자세금계산서\n승인번호: 20260522-45496015-25492573\n작성일자: 2026-05-22\n공급자: (주)미래유통 (등록번호 209-80-30374)\n공급받는자: 동성물산 주식회사 (등록번호 378-46-89276)\n\n품목: 전산장비 납품\n\n공급가액  36,446,000원\n세액  3,644,600원\n합계금액  40,090,600원\n",
+  "injected_error": null,
+  "fields": [
+    {
+      "field": "supply",
+      "raw": "36,446,000원",
+      "number": 36446000,
+      "grounding_quote": "공급가액  36,446,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "vat",
+      "raw": "3,644,600원",
+      "number": 3644600,
+      "grounding_quote": "세액  3,644,600원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total",
+      "raw": "40,090,600원",
+      "number": 40090600,
+      "grounding_quote": "합계금액  40,090,600원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

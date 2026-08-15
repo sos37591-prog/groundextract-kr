@@ -1,0 +1,10 @@
+{
+  "doc_id": "tax_clean_01",
+  "doc_type": "tax_invoice",
+  "full_text": "전자세금계산서\n공급가액  1,000,000원\n세액        100,000원\n합계금액  1,100,000원\n",
+  "fields": [
+    {"field": "supply", "raw": "1,000,000원", "number": 1000000, "grounding_quote": "공급가액  1,000,000원", "expected_verdict": "verified"},
+    {"field": "vat", "raw": "100,000원", "number": 100000, "grounding_quote": "세액        100,000원", "expected_verdict": "verified"},
+    {"field": "total", "raw": "1,100,000원", "number": 1100000, "grounding_quote": "합계금액  1,100,000원", "expected_verdict": "verified"}
+  ]
+}

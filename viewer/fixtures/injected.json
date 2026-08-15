@@ -1,0 +1,169 @@
+{
+  "doc_text": "전자세금계산서\n작성일자 2026-07-01  승인번호 20260701-41000000-12345678\n공급자 주식회사 가온소프트  공급받는자 주식회사 나래상사\n\n품목1 공급가  400,000원\n품목2 공급가  600,000원\n\n공급가액  1,000,000원\n세액        100,000원\n합계금액  1,100,000원\n",
+  "summary": {
+    "total": 5,
+    "verified": 2,
+    "discarded": 3,
+    "ungrounded": 1
+  },
+  "fields": [
+    {
+      "field": "item1_supply",
+      "value": {
+        "field": "item1_supply",
+        "raw": "400,000원",
+        "number": 400000,
+        "grounding_quote": "품목1 공급가  400,000원",
+        "page": null,
+        "bbox": null,
+        "confidence": 1.0
+      },
+      "checks": [
+        {
+          "name": "grounding",
+          "passed": true,
+          "detail": "verbatim substring: '400,000원'",
+          "kind": "exact"
+        },
+        {
+          "name": "supply_equals_sum_of_items",
+          "passed": true,
+          "detail": "supply=1e+06 vs sum(item1_supply+item2_supply)=1e+06",
+          "kind": null
+        }
+      ],
+      "verdict": "verified",
+      "confidence": 1.0
+    },
+    {
+      "field": "item2_supply",
+      "value": {
+        "field": "item2_supply",
+        "raw": "600,000원",
+        "number": 600000,
+        "grounding_quote": "품목2 공급가  600,000원",
+        "page": null,
+        "bbox": null,
+        "confidence": 1.0
+      },
+      "checks": [
+        {
+          "name": "grounding",
+          "passed": true,
+          "detail": "verbatim substring: '600,000원'",
+          "kind": "exact"
+        },
+        {
+          "name": "supply_equals_sum_of_items",
+          "passed": true,
+          "detail": "supply=1e+06 vs sum(item1_supply+item2_supply)=1e+06",
+          "kind": null
+        }
+      ],
+      "verdict": "verified",
+      "confidence": 1.0
+    },
+    {
+      "field": "supply",
+      "value": {
+        "field": "supply",
+        "raw": "1,000,000원",
+        "number": 1000000,
+        "grounding_quote": "공급가액  1,000,000원",
+        "page": null,
+        "bbox": null,
+        "confidence": 1.0
+      },
+      "checks": [
+        {
+          "name": "grounding",
+          "passed": true,
+          "detail": "verbatim substring: '1,000,000원'",
+          "kind": "exact"
+        },
+        {
+          "name": "vat_equals_supply_x_10pct",
+          "passed": false,
+          "detail": "250000 vs 100000 (tol 1) -> diff 150000",
+          "kind": null
+        },
+        {
+          "name": "total_equals_supply_plus_vat",
+          "passed": false,
+          "detail": "1.1e+06 vs 1.25e+06 (tol 1) -> diff 150000",
+          "kind": null
+        },
+        {
+          "name": "supply_equals_sum_of_items",
+          "passed": true,
+          "detail": "supply=1e+06 vs sum(item1_supply+item2_supply)=1e+06",
+          "kind": null
+        }
+      ],
+      "verdict": "discarded",
+      "confidence": 0.0
+    },
+    {
+      "field": "vat",
+      "value": {
+        "field": "vat",
+        "raw": "250,000원",
+        "number": 250000,
+        "grounding_quote": "세액        100,000원",
+        "page": null,
+        "bbox": null,
+        "confidence": 1.0
+      },
+      "checks": [
+        {
+          "name": "grounding",
+          "passed": false,
+          "detail": "no grounding (best fuzzy ratio=0.56)",
+          "kind": "none"
+        },
+        {
+          "name": "vat_equals_supply_x_10pct",
+          "passed": false,
+          "detail": "250000 vs 100000 (tol 1) -> diff 150000",
+          "kind": null
+        },
+        {
+          "name": "total_equals_supply_plus_vat",
+          "passed": false,
+          "detail": "1.1e+06 vs 1.25e+06 (tol 1) -> diff 150000",
+          "kind": null
+        }
+      ],
+      "verdict": "discarded",
+      "confidence": 0.0
+    },
+    {
+      "field": "total",
+      "value": {
+        "field": "total",
+        "raw": "1,100,000원",
+        "number": 1100000,
+        "grounding_quote": "합계금액  1,100,000원",
+        "page": null,
+        "bbox": null,
+        "confidence": 1.0
+      },
+      "checks": [
+        {
+          "name": "grounding",
+          "passed": true,
+          "detail": "verbatim substring: '1,100,000원'",
+          "kind": "exact"
+        },
+        {
+          "name": "total_equals_supply_plus_vat",
+          "passed": false,
+          "detail": "1.1e+06 vs 1.25e+06 (tol 1) -> diff 150000",
+          "kind": null
+        }
+      ],
+      "verdict": "discarded",
+      "confidence": 0.0
+    }
+  ]
+}

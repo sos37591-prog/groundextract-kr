@@ -1,0 +1,32 @@
+{
+  "doc_id": "gen_tax_003",
+  "doc_type": "tax_invoice",
+  "full_text": "전자세금계산서\n승인번호: 20260406-46231783-95899313\n작성일자: 2026-04-06\n공급자: (주)누리상사 (등록번호 804-81-38785)\n공급받는자: 한결시스템 주식회사 (등록번호 801-51-17331)\n\n품목: 전산장비 납품\n\n공급가액  47,884,000원\n세액  4,788,400원\n합계금액  52,672,400원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "supply"
+  },
+  "fields": [
+    {
+      "field": "supply",
+      "raw": "53,943,426원",
+      "number": 53943426,
+      "grounding_quote": "공급가액  53,943,426원",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "vat",
+      "raw": "4,788,400원",
+      "number": 4788400,
+      "grounding_quote": "세액  4,788,400원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total",
+      "raw": "52,672,400원",
+      "number": 52672400,
+      "grounding_quote": "합계금액  52,672,400원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

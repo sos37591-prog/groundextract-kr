@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# SBOM (CI-generated; regenerated each run)
+sbom/*.json
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets / local env
+.env
+*.local
+
+# Contest submission artifacts (개인정보/PII 포함 — keep out of public repo)
+submission/
+
+# Internal planning notes (직원 실명·IP·리소스 리스크 — 로컬 보관, 공개 저장소 제외)
+docs/
+
+# Local agent notes: contest schedule, submission paths, unreleased risks.
+# Do not rely on a global gitignore for this — it must be excluded on any machine.
+CLAUDE.md
+
+# Unmasked real sources (PII / 실제 기업 재무·세무 원본) — never commit
+bench/sample_pdf/real_tax_invoice.png
+local/

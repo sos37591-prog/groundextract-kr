@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; margin: 40px; color: #111; }
+  h1 { text-align: center; font-size: 22px; letter-spacing: 8px; border: 2px solid #c0392b; color: #c0392b; padding: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+  th, td { border: 1px solid #555; padding: 6px 8px; }
+  th { background: #f4e9e7; font-weight: 600; }
+  .amount { text-align: right; font-variant-numeric: tabular-nums; }
+  .totals td { font-weight: 700; background: #fbf6f5; }
+  .meta { margin-top: 10px; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>전자세금계산서</h1>
+  <p class="meta">승인번호: 20260701-41000000-12345678 &nbsp;|&nbsp; 작성일자: 2026-07-01</p>
+  <table>
+    <tr><th>공급자</th><td>주식회사 가온소프트 (등록번호 214-86-53210)</td>
+        <th>공급받는자</th><td>주식회사 나래상사 (등록번호 133-81-54321)</td></tr>
+  </table>
+  <table>
+    <tr><th>품목</th><th>수량</th><th>공급가액</th><th>세액</th></tr>
+    <tr><td>소프트웨어 개발</td><td class="amount">1</td><td class="amount">400,000원</td><td class="amount">40,000원</td></tr>
+    <tr><td>시스템 유지보수</td><td class="amount">1</td><td class="amount">600,000원</td><td class="amount">60,000원</td></tr>
+  </table>
+  <table>
+    <tr class="totals"><td>공급가액</td><td class="amount">1,000,000원</td></tr>
+    <tr class="totals"><td>세액</td><td class="amount">100,000원</td></tr>
+    <tr class="totals"><td>합계금액</td><td class="amount">1,100,000원</td></tr>
+  </table>
+  <p class="meta">이 금액을 (청구) 함</p>
+</body>
+</html>

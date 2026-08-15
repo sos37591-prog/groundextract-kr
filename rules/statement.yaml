@@ -1,0 +1,24 @@
+# Financial statement (재무제표) arithmetic rule pack.
+# MVP scope: 차변 총액 = 대변 총액 (debit = credit). This is the shallow rule
+# committed for the contest MVP.
+#
+# v0.2 / enterprise (kept as reference, NOT part of MVP):
+#   - assets = liabilities + equity            (자산 = 부채 + 자본)
+#   - equity_ratio sums to 1                    (지분합 = 1)
+
+doc_type: statement
+
+rules:
+  # 차변 총액 = 대변 총액
+  - name: debit_equals_credit
+    type: equals
+    lhs: {field: debit_total}
+    rhs: {field: credit_total}
+    tol: 1.0
+
+  # v0.2 (uncomment when balance-sheet fields are extracted):
+  # - name: assets_equal_liabilities_plus_equity
+  #   type: equals
+  #   lhs: {field: assets}
+  #   rhs: {expr: "liabilities + equity"}
+  #   tol: 1.0

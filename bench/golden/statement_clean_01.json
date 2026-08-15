@@ -1,0 +1,9 @@
+{
+  "doc_id": "statement_clean_01",
+  "doc_type": "statement",
+  "full_text": "합계잔액시산표\n차변 합계  3,000,000원\n대변 합계  3,000,000원\n",
+  "fields": [
+    {"field": "debit_total", "raw": "3,000,000원", "number": 3000000, "grounding_quote": "차변 합계  3,000,000원", "expected_verdict": "verified"},
+    {"field": "credit_total", "raw": "3,000,000원", "number": 3000000, "grounding_quote": "대변 합계  3,000,000원", "expected_verdict": "verified"}
+  ]
+}

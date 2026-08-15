@@ -1,0 +1,27 @@
+# Keep the demo image small and reproducible: ship source + rules + golden set only.
+.git
+.github
+.venv
+venv
+env
+**/__pycache__
+*.py[cod]
+*.egg-info
+build
+dist
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+coverage.xml
+htmlcov
+sbom
+local
+submission
+docs
+.env
+*.local
+.idea
+.vscode
+.DS_Store
+Thumbs.db

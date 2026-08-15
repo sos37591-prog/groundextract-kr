@@ -1,0 +1,24 @@
+# Code owners for GroundExtract-KR.
+# Listed owners are requested for review automatically on matching pull requests.
+# Syntax: https://docs.github.com/articles/about-code-owners
+
+# Default owner for everything in the repository.
+*                           @sos37591-prog
+
+# Trust boundary: the deterministic gate. Changes here can turn a discarded
+# hallucination into a verified one, so they always need an owner review.
+/groundextract/grounding.py @sos37591-prog
+/groundextract/rules.py     @sos37591-prog
+/groundextract/gate.py      @sos37591-prog
+/groundextract/models.py    @sos37591-prog
+
+# Domain invariants and the labeled benchmark that measures them.
+/rules/                     @sos37591-prog
+/bench/                     @sos37591-prog
+/groundextract/bench.py     @sos37591-prog
+
+# Public interfaces and supply chain.
+/groundextract/mcp_server.py @sos37591-prog
+/pyproject.toml              @sos37591-prog
+/.github/                    @sos37591-prog
+/SECURITY.md                 @sos37591-prog

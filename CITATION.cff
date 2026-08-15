@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "GroundExtract-KR: a value-level truth gate for numbers extracted from Korean regulatory documents"
+abstract: >-
+  GroundExtract-KR is an open-source verification gate that sits after OCR/LLM
+  document extraction. Every extracted number must (1) be grounded verbatim in the
+  source text at the span the model cited and (2) satisfy the document domain's
+  arithmetic invariants, expressed as YAML rule packs (VAT = supply x 10%,
+  assets = liabilities + equity, debit total = credit total). Values that fail
+  either check are auto-discarded at confidence 0 before they reach downstream
+  systems. The two checks catch disjoint error classes: verbatim grounding catches
+  fabricated numbers, while only the arithmetic rules catch a number that is
+  genuinely present in the document but attached to the wrong field. The decision
+  is made by deterministic code, not by a second model, so it is reproducible and
+  runs offline with no API key. The project ships NumHall-KR, a deterministic
+  regression suite of 46 documents and 146 labeled fields (40 synthetic from a
+  fixed-seed generator plus 6 hand-written), on which the gate reduces the numeric
+  hallucination rate from 19.9% to 0.0% at 100% auto-discard recall and 35.8%
+  precision, and an MCP server so that agents consume only verified values.
+type: software
+authors:
+  - given-names: "Hoyoung"
+    family-names: "Son"
+  - given-names: "Hanna"
+    family-names: "Hwang"
+version: "0.1.0"
+date-released: 2026-08-15
+license: Apache-2.0
+repository-code: "https://github.com/sos37591-prog/groundextract-kr"
+url: "https://github.com/sos37591-prog/groundextract-kr"
+keywords:
+  - hallucination-detection
+  - grounding
+  - document-ai
+  - information-extraction
+  - korean
+  - tax-invoice
+  - financial-statement
+  - trustworthy-ai
+  - model-context-protocol
+  - benchmark

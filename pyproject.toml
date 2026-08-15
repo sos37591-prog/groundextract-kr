@@ -1,0 +1,97 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "groundextract"
+version = "0.1.0"
+description = "Value-level truth gate for Korean regulatory documents: verbatim grounding + arithmetic rules + auto-discard of hallucinated numbers."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "Hoyoung Son" },
+    { name = "Hanna Hwang" },
+]
+keywords = [
+    "nlp",
+    "document-ai",
+    "hallucination",
+    "hallucination-detection",
+    "grounding",
+    "verification",
+    "trustworthy-ai",
+    "information-extraction",
+    "korean",
+    "tax-invoice",
+    "financial-statement",
+    "mcp",
+    "ocr",
+]
+# No "License :: ..." classifier on purpose: `license` above is an SPDX
+# expression (PEP 639), and PyPI rejects metadata that carries both.
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Natural Language :: Korean",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Office/Business :: Financial :: Accounting",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Linguistic",
+]
+# Runtime dependency surface is deliberately ONE package. Keep it that way:
+# "one pip install, no keys, no network" is a core property of the gate.
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+# PDF -> text/bbox conversion for groundextract.adapters.DoclingAdapter.
+docling = ["docling>=2.0"]
+# Regenerating the viewer fixture (viewer/build_combined_fixture.py):
+# PDF rendering + image masking. Not needed to run the viewer, which ships
+# with the generated fixture committed.
+fixture = ["pymupdf", "pillow"]
+# NOTE: there is no "llm" extra on purpose. The Ollama backend
+# (groundextract.llm.OllamaExtractor) and the MCP server are standard library
+# only; they need a running Ollama server, not a Python package.
+
+[project.urls]
+Homepage = "https://github.com/sos37591-prog/groundextract-kr"
+Repository = "https://github.com/sos37591-prog/groundextract-kr"
+Issues = "https://github.com/sos37591-prog/groundextract-kr/issues"
+Changelog = "https://github.com/sos37591-prog/groundextract-kr/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["groundextract"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# UP042: `class X(str, Enum)` is intentional (JSON-serializable string enums,
+# portable to <3.11 consumers); we don't force StrEnum.
+ignore = ["UP042"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+ignore_missing_imports = true

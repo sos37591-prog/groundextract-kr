@@ -1,0 +1,22 @@
+{
+  "doc_id": "gen_stmt_010",
+  "doc_type": "statement",
+  "full_text": "합계잔액시산표\n청람테크 주식회사  2026년 07월 09일 현재\n(단위: 원)\n\n계정과목  차변  대변\n보통예금  차변 3,296,000원\n미수금  차변 57,719,000원\n자본금  대변 21,454,000원\n선수금  대변 3,391,000원\n매출  대변 36,170,000원\n\n차변 합계  61,015,000원\n대변 합계  61,015,000원\n",
+  "injected_error": null,
+  "fields": [
+    {
+      "field": "debit_total",
+      "raw": "61,015,000원",
+      "number": 61015000,
+      "grounding_quote": "차변 합계  61,015,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "credit_total",
+      "raw": "61,015,000원",
+      "number": 61015000,
+      "grounding_quote": "대변 합계  61,015,000원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

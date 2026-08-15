@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a gate bypass (security)
+    url: https://github.com/sos37591-prog/groundextract-kr/security/advisories/new
+    about: A wrong number that comes out `verified` is a false negative and the most serious bug class here. Report it privately, not as a public issue.
+  - name: Contributing guide and good first issues
+    url: https://github.com/sos37591-prog/groundextract-kr/blob/main/CONTRIBUTING.md
+    about: Dev setup, how to add a rule pack for a new document type, PR rules, and a list of good first issues.
+  - name: How the gate works (README)
+    url: https://github.com/sos37591-prog/groundextract-kr/blob/main/README.md
+    about: Quick start, the two disjoint checks, MCP usage, honest benchmark numbers, and known limitations.
