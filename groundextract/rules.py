@@ -32,6 +32,23 @@ import yaml
 
 from .models import Check
 
+# --- locating the shipped rule packs ------------------------------------------
+
+
+def default_rules_dir() -> Path:
+    """Directory holding the bundled ``<doc_type>.yaml`` rule packs.
+
+    Installed wheels carry the packs inside the package (see the
+    ``force-include`` entry in pyproject.toml); a source checkout keeps them at
+    the repository root. Checking the package copy first means
+    ``pip install groundextract`` works without the repository present.
+    """
+    packaged = Path(__file__).resolve().parent / "rules"
+    if packaged.is_dir():
+        return packaged
+    return Path(__file__).resolve().parent.parent / "rules"
+
+
 # --- safe arithmetic expression evaluator -------------------------------------
 
 _BIN_OPS = {

@@ -8,12 +8,11 @@ numbers stay verified. Real PDF/LLM paths are TODO (see llm/base.py).
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from .gate import run_gate, summarize
 from .llm import MockExtractor
 from .models import ExtractedValue
-from .rules import load_rule_pack
+from .rules import default_rules_dir, load_rule_pack
 
 _DOC = (
     "전자세금계산서\n"
@@ -24,7 +23,7 @@ _DOC = (
 
 
 def main() -> None:
-    pack = load_rule_pack(Path(__file__).resolve().parent.parent / "rules" / "tax_invoice.yaml")
+    pack = load_rule_pack(default_rules_dir() / "tax_invoice.yaml")
 
     # Two grounded/consistent values + one hallucinated VAT (250,000 is nowhere
     # in the document and breaks vat = supply * 10%).

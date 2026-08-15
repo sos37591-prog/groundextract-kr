@@ -77,6 +77,12 @@ Changelog = "https://github.com/sos37591-prog/groundextract-kr/blob/main/CHANGEL
 [tool.hatch.build.targets.wheel]
 packages = ["groundextract"]
 
+# The rule packs are data the library cannot run without, so ship them inside
+# the package. `groundextract.rules.default_rules_dir()` prefers this copy and
+# falls back to the repository layout when running from a checkout.
+[tool.hatch.build.targets.wheel.force-include]
+"rules" = "groundextract/rules"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

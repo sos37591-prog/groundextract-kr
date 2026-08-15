@@ -29,10 +29,10 @@ from pathlib import Path
 
 from .gate import run_gate, summarize
 from .models import ExtractedValue
-from .rules import load_rule_pack
+from .rules import default_rules_dir, load_rule_pack
 
 _ROOT = Path(__file__).resolve().parent.parent
-_RULES = _ROOT / "rules" / "tax_invoice.yaml"
+_RULES = default_rules_dir() / "tax_invoice.yaml"
 _FIXTURES_DIR = _ROOT / "viewer" / "fixtures"
 
 # The ``__main__`` demo invoice, extended with line items so the sum invariant

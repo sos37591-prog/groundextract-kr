@@ -22,18 +22,17 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 from typing import Any
 
 from . import __version__
 from .gate import run_gate, summarize
 from .models import ExtractedValue
-from .rules import RulePack, load_rule_pack
+from .rules import RulePack, default_rules_dir, load_rule_pack
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "groundextract-mcp"
 
-_RULES_DIR = Path(__file__).resolve().parent.parent / "rules"
+_RULES_DIR = default_rules_dir()
 
 # JSON-RPC 2.0 error codes.
 PARSE_ERROR = -32700
