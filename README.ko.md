@@ -7,9 +7,10 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Runtime deps: 1](https://img.shields.io/badge/runtime%20deps-1%20%28PyYAML%29-brightgreen.svg)](pyproject.toml)
 
-> **[▶ 라이브 데모](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet)** —
-> *환각 주입* 토글을 누르면, 근거검증은 통과하는 한 자리 오독을 산술 정합성만으로 잡아내는
-> 장면을 볼 수 있습니다. 설치 없이 브라우저에서 바로 동작합니다.
+> **[▶ 라이브 데모](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet&injected=1)** —
+> *환각 주입* 토글이 켜진 상태로 열립니다. 비유동자산 한 자리 오독이 문서 텍스트에도 존재해
+> 근거검증은 통과하고, 오직 재무상태표 항등식만이 이를 잡아냅니다. 토글을 끄면 같은 문서가
+> 전부 초록으로 돌아옵니다. 설치 없이 브라우저에서 바로 동작합니다.
 >
 > 🇬🇧 English documentation: **[README.md](README.md)**
 
@@ -36,6 +37,7 @@ git clone https://github.com/sos37591-prog/groundextract-kr.git
 cd groundextract-kr
 python -m pip install -e .     # Python 3.11+, 런타임 의존성은 PyYAML 하나뿐
 python -m groundextract        # 무키(no-API-key) 데모, 네트워크 불필요
+python -m groundextract --help # 이 데모가 무엇이고 다음에 무엇을 할지 안내
 ```
 
 컨테이너를 선호한다면 `docker build -t groundextract-kr . && docker run --rm groundextract-kr`
@@ -54,12 +56,21 @@ XX vat    value=250,000원     verdict=discarded conf=0.0
        ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
 XX total  value=1,100,000원   verdict=discarded conf=0.0
        ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
-summary: {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1}
+summary: {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1, "rule_pack": "tax_invoice", "rules_applied": 2}
 ```
+
+요약의 `rule_pack`·`rules_applied`는 **어떤 불변식이 실제로 돌았는지**를 기록합니다.
+`rules_applied: 0`이면 산술 검증이 하나도 수행되지 않았다는 뜻이며, "전부 통과"와는 전혀
+다른 상황입니다.
 
 환각된 `vat`뿐 아니라 세 필드가 모두 폐기됩니다. 위반된 산술 규칙이 `supply`·`total`을
 참조하므로 게이트가 **형제 필드까지 보수적으로 함께 폐기**하기 때문입니다. 이 트레이드오프는
 [지표](#numhall-kr-벤치마크)와 [한계](#한계)에서 그대로 공개합니다.
+
+이 명령은 내장 데모만 실행합니다. 문서 파일 인자를 받지 않으며(넘기면 처리한 척하지 않고
+그렇다고 알려줍니다), `--json`은 동일한 결과를 기계가 읽을 수 있는 JSON으로 출력합니다.
+패키지를 설치하면 동일한 동작의 `groundextract` 명령도 PATH에 등록됩니다.
+**내 문서**를 검증하려면 아래의 라이브러리 또는 MCP 서버를 쓰세요.
 
 ---
 
@@ -126,10 +137,10 @@ summary: {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1}
 ## 코드로 쓰기
 
 ```python
-from groundextract import ExtractedValue, load_rule_pack, run_gate
+from groundextract import ExtractedValue, load_pack, run_gate
 
 doc = "공급가액 1,000,000원\n세액 100,000원\n합계금액 1,100,000원"
-pack = load_rule_pack("rules/tax_invoice.yaml")
+pack = load_pack("tax_invoice")   # 패키지에 동봉된 룰팩을 자동으로 찾음
 
 values = [
     ExtractedValue("supply", "1,000,000원", 1_000_000, "공급가액 1,000,000원"),
@@ -142,6 +153,12 @@ for f in run_gate(values, doc, pack):
     # supply verified 1.0 / vat verified 1.0 / total verified 1.0
 ```
 
+`load_pack(doc_type)`은 **패키지 내부**에 동봉된 룰팩을 찾으므로 어느 작업 디렉터리에서도,
+`pip install`한 wheel에서도 그대로 동작합니다(저장소 체크아웃 불필요).
+동봉된 유형은 `available_doc_types()`로 확인하고(`tax_invoice`·`statement`·`balance_sheet`),
+경로는 `default_rules_dir()`가 알려줍니다. 직접 만든 룰팩은 기존대로
+`load_rule_pack("경로/my_doc_type.yaml")`를 쓰면 됩니다.
+
 core·MCP·벤치·뷰어가 단일 출력계약을 공유합니다:
 
 ```python
@@ -152,27 +169,39 @@ VerifiedField(field, value, checks[], verdict, confidence)
 
 ## MCP 서버 — 에이전트는 verified 값만 소비한다
 
-`groundextract.mcp_server`는 **무의존 MCP 서버**입니다(프로토콜 `2024-11-05`, stdio 위
-개행 구분 JSON-RPC 2.0, 표준 라이브러리만 사용). 에이전트를 여기에 연결하면 게이트를
-통과하지 못한 숫자로는 아무 행동도 할 수 없게 됩니다.
+**MCP(Model Context Protocol)는 AI 에이전트가 외부 도구를 호출하는 표준 규약입니다.**
+이 서버를 붙이면 에이전트는 게이트를 통과하지 못한 숫자에 접근할 수 없습니다 — 모든 값이
+판정과 함께 전달되고, 폐기된 값은 폐기된 상태로 전달됩니다.
+
+`groundextract.mcp_server`는 이를 **무의존**으로 구현합니다(프로토콜 `2024-11-05`, stdio 위
+개행 구분 JSON-RPC 2.0, 표준 라이브러리만 사용).
 
 ```bash
 python -m groundextract.mcp_server
+
+# 에이전트 없이 확인하기 — 서버가 stdin/stdout으로 바로 응답합니다:
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python -m groundextract.mcp_server
 ```
 
-클라이언트 설정(Claude Desktop / Claude Code 등):
+클라이언트 설정(Claude Desktop / Claude Code 등). `groundextract`가 설치된 **인터프리터의
+절대경로**를 쓰세요 — 클라이언트는 자체 환경으로 서버를 띄우기 때문에 맨 `python`은 보통
+다른 곳을 가리킵니다:
 
 ```json
 {
   "mcpServers": {
     "groundextract": {
-      "command": "python",
-      "args": ["-m", "groundextract.mcp_server"],
-      "cwd": "/path/to/groundextract-kr"
+      "command": "/absolute/path/to/venv/bin/python",
+      "args": ["-m", "groundextract.mcp_server"]
     }
   }
 }
 ```
+
+Windows에서는 `C:\\path\\to\\venv\\Scripts\\python.exe`처럼 적습니다(JSON이라 역슬래시는
+이스케이프). 패키지를 설치했다면 룰팩이 패키지 안에 동봉되므로 `cwd`는 필요 없습니다.
+저장소를 체크아웃해 그 자리에서 실행한다면 `"cwd": "/absolute/path/to/groundextract-kr"`를
+추가하세요.
 
 | 툴 | 모델 필요? | 하는 일 |
 | --- | --- | --- |
@@ -274,6 +303,17 @@ python -m http.server 8931 --directory viewer   # → http://localhost:8931/inde
 ```
 
 픽스처가 저장소에 포함되어 오프라인에서 동작합니다. [`viewer/README.md`](viewer/README.md) 참조.
+
+화면 상태는 **딥링크**로 공유·캡처할 수 있습니다(호스팅 데모와 localhost 모두 동일):
+
+| 파라미터 | 의미 |
+| --- | --- |
+| `?doc=<id>` | 문서 선택: `tax_invoice` 또는 `balance_sheet` |
+| `&injected=1` | *환각 주입* 토글이 켜진 상태로 시작 |
+| `&tip=<field>` | 해당 필드의 폐기 사유 툴팁을 고정 표시 (예: `noncurrent_assets`) |
+
+예시:
+[`?doc=balance_sheet&injected=1&tip=noncurrent_assets`](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet&injected=1&tip=noncurrent_assets)
 
 ## 실문서 파이프라인 (옵션)
 

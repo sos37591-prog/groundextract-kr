@@ -11,9 +11,11 @@
 [![PyPI](https://img.shields.io/pypi/v/groundextract.svg)](https://pypi.org/project/groundextract/)
 -->
 
-> **[▶ Live demo](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet)** — hit
-> the *환각 주입* toggle and watch a one-digit misread survive grounding and get caught by
-> arithmetic alone. Nothing to install; the page is static and runs entirely in your browser.
+> **[▶ Live demo](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet&injected=1)**
+> — opens with the *환각 주입* (hallucination injected) toggle already on: one digit of
+> 비유동자산 is misread, the wrong number is present in the document text so grounding passes,
+> and only the balance-sheet identity catches it. Toggle it off to see the same document come
+> back all-green. Nothing to install; the page is static and runs entirely in your browser.
 >
 > 🇰🇷 한국어 문서: **[README.ko.md](README.ko.md)**
 
@@ -40,6 +42,7 @@ git clone https://github.com/sos37591-prog/groundextract-kr.git
 cd groundextract-kr
 python -m pip install -e .     # Python 3.11+, exactly one runtime dep (PyYAML)
 python -m groundextract        # key-free demo, no network
+python -m groundextract --help # what the demo shows, and where to go next
 ```
 
 Prefer a container? `docker build -t groundextract-kr . && docker run --rm groundextract-kr`
@@ -59,13 +62,23 @@ XX vat    value=250,000원     verdict=discarded conf=0.0
        ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
 XX total  value=1,100,000원   verdict=discarded conf=0.0
        ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
-summary: {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1}
+summary: {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1, "rule_pack": "tax_invoice", "rules_applied": 2}
 ```
+
+`rule_pack` and `rules_applied` in the summary record which invariants actually ran:
+`rules_applied: 0` would mean the gate had no arithmetic to check with at all, which is a
+very different situation from "everything passed".
 
 Note that all three fields are discarded, not just the hallucinated one — the violated
 arithmetic rules reference `supply` and `total`, so the gate conservatively discards the
 siblings too. That trade-off is discussed under [Metrics](#benchmark-numhall-kr) and
 [Limitations](#limitations).
+
+This command runs that built-in demo and nothing else: it takes no document argument (pass
+one and it says so instead of pretending to process it), and `--json` prints the same
+result as machine-readable JSON. Installing the package also puts an equivalent
+`groundextract` command on your PATH. To verify *your* numbers, use the library or the MCP
+server below.
 
 ---
 
@@ -135,10 +148,10 @@ rule pack (YAML)      ──▶ arithmetic engine ───┘        (fail eith
 ## Use it as a library
 
 ```python
-from groundextract import ExtractedValue, load_rule_pack, run_gate
+from groundextract import ExtractedValue, load_pack, run_gate
 
 doc = "공급가액 1,000,000원\n세액 100,000원\n합계금액 1,100,000원"
-pack = load_rule_pack("rules/tax_invoice.yaml")
+pack = load_pack("tax_invoice")   # bundled rule pack, resolved from the installed package
 
 values = [
     ExtractedValue("supply", "1,000,000원", 1_000_000, "공급가액 1,000,000원"),
@@ -151,6 +164,12 @@ for f in run_gate(values, doc, pack):
     # supply verified 1.0 / vat verified 1.0 / total verified 1.0
 ```
 
+`load_pack(doc_type)` finds the packs that ship *inside* the package, so it works from any
+working directory and from a `pip install`ed wheel — no repository checkout required.
+`available_doc_types()` lists what ships (`tax_invoice`, `statement`, `balance_sheet`) and
+`default_rules_dir()` returns where they live. For a pack of your own, keep using
+`load_rule_pack("path/to/my_doc_type.yaml")`.
+
 Every consumer (core, MCP server, benchmark, viewer) shares one output contract:
 
 ```python
@@ -161,27 +180,38 @@ VerifiedField(field, value, checks[], verdict, confidence)
 
 ## MCP server — agents consume only verified values
 
-`groundextract.mcp_server` is a dependency-free MCP server (protocol `2024-11-05`,
-newline-delimited JSON-RPC 2.0 over stdio, standard library only). Point an agent at it
-and the agent can no longer act on numbers that failed the gate.
+**MCP (Model Context Protocol) is the standard way an AI agent calls an external tool.**
+Attach this server to an agent and the agent can no longer reach a number that failed the
+gate — every value arrives with its verdict, and the discarded ones arrive as discarded.
+
+`groundextract.mcp_server` is a dependency-free implementation (protocol `2024-11-05`,
+newline-delimited JSON-RPC 2.0 over stdio, standard library only):
 
 ```bash
 python -m groundextract.mcp_server
+
+# smoke test without an agent — the server answers on stdin/stdout:
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | python -m groundextract.mcp_server
 ```
 
-Client config (Claude Desktop / Claude Code / any MCP client):
+Client config (Claude Desktop / Claude Code / any MCP client). Use the **absolute path of
+the interpreter that has `groundextract` installed** — the client launches the server with
+its own environment, where a bare `python` usually resolves somewhere else:
 
 ```json
 {
   "mcpServers": {
     "groundextract": {
-      "command": "python",
-      "args": ["-m", "groundextract.mcp_server"],
-      "cwd": "/path/to/groundextract-kr"
+      "command": "/absolute/path/to/venv/bin/python",
+      "args": ["-m", "groundextract.mcp_server"]
     }
   }
 }
 ```
+
+On Windows that is `C:\\path\\to\\venv\\Scripts\\python.exe` (escaped backslashes in JSON).
+No `cwd` is needed once the package is installed — the rule packs ship inside it. Running
+straight from a source checkout instead? Add `"cwd": "/absolute/path/to/groundextract-kr"`.
 
 | Tool | Needs a model? | What it does |
 | --- | --- | --- |
@@ -207,7 +237,8 @@ call returns the full audit trail — here, the same hallucinated VAT:
       "confidence": 0.0
     }
   ],
-  "summary": {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1}
+  "summary": {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1,
+              "rule_pack": "tax_invoice", "rules_applied": 2}
 }
 ```
 
@@ -312,6 +343,18 @@ python -m http.server 8931 --directory viewer   # → http://localhost:8931/inde
 ```
 
 Fixtures are committed, so it works offline. See [`viewer/README.md`](viewer/README.md).
+
+The scene is deep-linkable — useful for sharing a specific failure or capturing a
+screenshot (the query string works on the hosted demo and on localhost alike):
+
+| Parameter | Meaning |
+| --- | --- |
+| `?doc=<id>` | which document: `tax_invoice` or `balance_sheet` |
+| `&injected=1` | start with the *환각 주입* (hallucination injected) toggle on |
+| `&tip=<field>` | pin that field's discard reason open, e.g. `noncurrent_assets` |
+
+Example:
+[`?doc=balance_sheet&injected=1&tip=noncurrent_assets`](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet&injected=1&tip=noncurrent_assets)
 
 ## Real-document pipeline (optional)
 

@@ -68,6 +68,11 @@ fixture = ["pymupdf", "pillow"]
 # (groundextract.llm.OllamaExtractor) and the MCP server are standard library
 # only; they need a running Ollama server, not a Python package.
 
+# `groundextract` on PATH == `python -m groundextract` (the built-in demo).
+# main() returns the process exit code, so a usage error exits non-zero.
+[project.scripts]
+groundextract = "groundextract.__main__:main"
+
 [project.urls]
 Homepage = "https://github.com/sos37591-prog/groundextract-kr"
 Repository = "https://github.com/sos37591-prog/groundextract-kr"
