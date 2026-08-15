@@ -7,6 +7,10 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Runtime deps: 1](https://img.shields.io/badge/runtime%20deps-1%20%28PyYAML%29-brightgreen.svg)](pyproject.toml)
 
+> **[▶ 라이브 데모](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet)** —
+> *환각 주입* 토글을 누르면, 근거검증은 통과하는 한 자리 오독을 산술 정합성만으로 잡아내는
+> 장면을 볼 수 있습니다. 설치 없이 브라우저에서 바로 동작합니다.
+>
 > 🇬🇧 English documentation: **[README.md](README.md)**
 
 한국 규제문서(세금계산서·재무제표·시산표)에서 AI가 추출한 **숫자마다**

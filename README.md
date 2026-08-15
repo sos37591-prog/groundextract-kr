@@ -11,6 +11,10 @@
 [![PyPI](https://img.shields.io/pypi/v/groundextract.svg)](https://pypi.org/project/groundextract/)
 -->
 
+> **[▶ Live demo](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet)** — hit
+> the *환각 주입* toggle and watch a one-digit misread survive grounding and get caught by
+> arithmetic alone. Nothing to install; the page is static and runs entirely in your browser.
+>
 > 🇰🇷 한국어 문서: **[README.ko.md](README.ko.md)**
 
 GroundExtract-KR is a **value-level truth gate** for numbers extracted from Korean
