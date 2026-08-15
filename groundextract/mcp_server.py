@@ -15,6 +15,13 @@ Tools:
     missing or the Ollama server is unreachable, returns an ``isError`` tool
     result with guidance instead of crashing.
 
+Trust boundary: every argument here is untrusted, and the documents this server
+verifies may themselves carry prompt injection aimed at the agent calling it.
+So the two things a caller could otherwise steer are not parameters at all —
+the Ollama endpoint is server configuration (``OLLAMA_HOST``) and ``doc_type``
+is an allowlist — and a bad line is answered with an error rather than ending
+the process, since a dead server silently drops every later request.
+
 Run:  python -m groundextract.mcp_server
 """
 
@@ -22,7 +29,8 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any
+from collections.abc import Iterator
+from typing import Any, TextIO
 
 from . import __version__
 from .gate import run_gate, summarize
@@ -33,6 +41,17 @@ PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "groundextract-mcp"
 
 _RULES_DIR = default_rules_dir()
+
+#: Document types this server accepts — the single source of truth for both the
+#: input schema ``enum`` and the runtime check in :func:`_rule_pack_for`. A
+#: doc_type outside this list is rejected instead of quietly resolving to "no
+#: rule pack", which used to mean "nothing arithmetic ran".
+SUPPORTED_DOC_TYPES: tuple[str, ...] = ("tax_invoice", "statement", "balance_sheet")
+
+#: Hard limits for the stdio loop. One malformed or hostile line must never be
+#: able to take the server down (see :func:`main`).
+MAX_LINE_CHARS = 4 * 1024 * 1024
+MAX_ERROR_DETAIL_CHARS = 200
 
 # JSON-RPC 2.0 error codes.
 PARSE_ERROR = -32700
@@ -68,7 +87,7 @@ _VALUE_SCHEMA: dict[str, Any] = {
 
 _DOC_TYPE_SCHEMA: dict[str, Any] = {
     "type": "string",
-    "enum": ["tax_invoice", "statement", "balance_sheet"],
+    "enum": list(SUPPORTED_DOC_TYPES),
     "description": "Document type; selects the arithmetic rule pack (rules/<doc_type>.yaml).",
 }
 
@@ -99,7 +118,8 @@ TOOLS: list[dict[str, Any]] = [
         "name": "extract_verified",
         "description": (
             "Extract values from the document with the local Ollama backend, then run "
-            "the verification gate. Requires a running Ollama server; use "
+            "the verification gate. Requires a running Ollama server, whose endpoint is "
+            "server configuration (OLLAMA_HOST) and cannot be chosen by the caller; use "
             "verify_extraction for the key-free deterministic path."
         ),
         "inputSchema": {
@@ -111,10 +131,8 @@ TOOLS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": "Optional Ollama model tag (default qwen2.5:7b).",
                 },
-                "host": {
-                    "type": "string",
-                    "description": "Optional Ollama base URL (default http://localhost:11434).",
-                },
+                # No "host": the Ollama endpoint is server configuration
+                # (OLLAMA_HOST), never caller input. See _extractor_kwargs.
                 "timeout": {
                     "type": "number",
                     "description": "Optional HTTP timeout in seconds for the Ollama call.",
@@ -134,6 +152,17 @@ def _require_str(args: dict[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value:
         raise InvalidParamsError(f"'{key}' must be a non-empty string")
     return value
+
+
+def _require_doc_type(args: dict[str, Any]) -> str:
+    """Validate ``doc_type`` against the advertised enum before anything runs."""
+    doc_type = _require_str(args, "doc_type")
+    if doc_type not in SUPPORTED_DOC_TYPES:
+        raise InvalidParamsError(
+            f"unsupported doc_type {doc_type!r}; expected one of "
+            f"{', '.join(SUPPORTED_DOC_TYPES)}"
+        )
+    return doc_type
 
 
 def _parse_values(raw_values: object) -> list[ExtractedValue]:
@@ -167,9 +196,20 @@ def _parse_values(raw_values: object) -> list[ExtractedValue]:
 
 
 def _rule_pack_for(doc_type: str) -> RulePack | None:
-    """Load ``rules/<doc_type>.yaml`` from the repo root, or None when absent."""
-    if not doc_type.replace("_", "").isalnum():  # no path separators / traversal
-        return None
+    """Load the bundled ``<doc_type>.yaml`` pack for an allowlisted doc type.
+
+    Only names in :data:`SUPPORTED_DOC_TYPES` (the same list the input schema
+    advertises) are accepted, so a typo like ``tax-invoice`` is refused rather
+    than silently yielding "no rule pack". That also rules out path separators
+    / traversal by construction. Defence in depth only: the gate itself is
+    fail-closed and discards numeric values no rule reached, so a missing pack
+    can never turn into a free pass.
+    """
+    if doc_type not in SUPPORTED_DOC_TYPES:
+        raise InvalidParamsError(
+            f"unsupported doc_type {doc_type!r}; expected one of "
+            f"{', '.join(SUPPORTED_DOC_TYPES)}"
+        )
     path = _RULES_DIR / f"{doc_type}.yaml"
     return load_rule_pack(path) if path.exists() else None
 
@@ -182,9 +222,14 @@ def _text_result(text: str, *, is_error: bool = False) -> dict[str, Any]:
 
 
 def _gate_payload(values: list[ExtractedValue], full_text: str, doc_type: str) -> str:
-    """Run the gate and serialize {fields, summary} as a JSON string."""
-    fields = run_gate(values, full_text, _rule_pack_for(doc_type))
-    payload = {"fields": [f.to_dict() for f in fields], "summary": summarize(fields)}
+    """Run the gate and serialize {fields, summary} as a JSON string.
+
+    The summary names the rule pack and how many arithmetic rules actually ran,
+    so the caller can see whether verification happened at all.
+    """
+    pack = _rule_pack_for(doc_type)
+    fields = run_gate(values, full_text, pack)
+    payload = {"fields": [f.to_dict() for f in fields], "summary": summarize(fields, pack)}
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -194,21 +239,33 @@ def _gate_payload(values: list[ExtractedValue], full_text: str, doc_type: str) -
 def _tool_verify_extraction(args: dict[str, Any]) -> dict[str, Any]:
     """Deterministic gate over caller-supplied extracted values. No keys, no network."""
     full_text = _require_str(args, "full_text")
-    doc_type = _require_str(args, "doc_type")
+    doc_type = _require_doc_type(args)
     values = _parse_values(args.get("values"))
     return _text_result(_gate_payload(values, full_text, doc_type))
 
 
 def _extractor_kwargs(args: dict[str, Any]) -> dict[str, Any]:
-    """Optional OllamaExtractor overrides (model/host/timeout) from tool args."""
+    """Optional OllamaExtractor overrides (model/timeout) from tool args.
+
+    ``host`` is deliberately **not** a tool parameter: the Ollama endpoint is
+    server configuration (the ``OLLAMA_HOST`` environment variable). A
+    caller-chosen host would make this tool a confused deputy — it would POST
+    the whole document to any host named in the request and hand the reply back
+    to the caller, which is exactly what a prompt injection hidden inside the
+    document under verification would aim for. Requests that still carry it are
+    rejected loudly rather than silently ignored.
+    """
+    if "host" in args:
+        raise InvalidParamsError(
+            "'host' is not accepted: the Ollama endpoint is server configuration "
+            "(set OLLAMA_HOST on the server running groundextract.mcp_server)"
+        )
     kwargs: dict[str, Any] = {}
-    for key in ("model", "host"):
-        value = args.get(key)
-        if value is None:
-            continue
-        if not isinstance(value, str) or not value:
-            raise InvalidParamsError(f"'{key}' must be a non-empty string")
-        kwargs[key] = value
+    model = args.get("model")
+    if model is not None:
+        if not isinstance(model, str) or not model:
+            raise InvalidParamsError("'model' must be a non-empty string")
+        kwargs["model"] = model
     timeout = args.get("timeout")
     if timeout is not None:
         if isinstance(timeout, bool) or not isinstance(timeout, int | float) or timeout <= 0:
@@ -220,7 +277,7 @@ def _extractor_kwargs(args: dict[str, Any]) -> dict[str, Any]:
 def _tool_extract_verified(args: dict[str, Any]) -> dict[str, Any]:
     """Ollama extraction + gate. Degrades to an isError result when unavailable."""
     full_text = _require_str(args, "full_text")
-    doc_type = _require_str(args, "doc_type")
+    doc_type = _require_doc_type(args)
     kwargs = _extractor_kwargs(args)
     try:
         from .llm import OllamaExtractor
@@ -318,27 +375,84 @@ def _write(message: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
+def _response_for_line(line: str) -> dict[str, Any] | None:
+    """Parse and handle one input line; return the response (None = notification).
+
+    Parsing is where hostile input bites, and ``json.JSONDecodeError`` does not
+    cover it: deeply nested arrays/objects raise ``RecursionError`` (a
+    ``RuntimeError``, *not* a ``ValueError``) and an integer literal beyond
+    ``sys.get_int_max_str_digits()`` raises a plain ``ValueError``. Both are
+    answered with a parse error instead of ending the session.
+    """
+    if len(line) > MAX_LINE_CHARS:
+        return _error_response(
+            None, INVALID_REQUEST, f"Invalid Request: line exceeds {MAX_LINE_CHARS} characters"
+        )
+    try:
+        msg = json.loads(line)
+    except RecursionError:
+        return _error_response(None, PARSE_ERROR, "Parse error: input nested too deeply")
+    except ValueError as exc:  # includes json.JSONDecodeError
+        detail = str(exc)[:MAX_ERROR_DETAIL_CHARS]
+        return _error_response(None, PARSE_ERROR, f"Parse error: {detail}")
+    if not isinstance(msg, dict):
+        return _error_response(None, INVALID_REQUEST, "Invalid Request: expected object")
+    return handle_message(msg)
+
+
+def _read_lines(stream: TextIO) -> Iterator[str | None]:
+    """Yield input lines with a size bound; ``None`` marks a dropped oversize line.
+
+    ``for line in stream`` buffers a line of *any* length, so one newline-free
+    flood would grow this process without limit. Reading with an explicit bound
+    caps that, and the rest of an oversized line is drained rather than handed
+    back as if its tail were the next request.
+    """
+    while True:
+        chunk = stream.readline(MAX_LINE_CHARS + 1)
+        if not chunk:
+            return
+        if len(chunk) > MAX_LINE_CHARS and not chunk.endswith("\n"):
+            while chunk and not chunk.endswith("\n"):  # drop the remainder
+                chunk = stream.readline(MAX_LINE_CHARS + 1)
+            yield None
+            continue
+        yield chunk
+
+
 def main() -> None:
-    """Serve MCP over stdio: newline-delimited JSON-RPC, one message per line."""
+    """Serve MCP over stdio: newline-delimited JSON-RPC, one message per line.
+
+    The loop is the server's lifetime: a single bad line must never end the
+    session, because every later request on that stdio pipe would then go
+    unanswered. Anything the per-line handling can raise is caught here and
+    reported as an error response.
+    """
     for stream in (sys.stdin, sys.stdout):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")  # Windows pipes default to cp949
 
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
+    for raw_line in _read_lines(sys.stdin):
         try:
-            msg = json.loads(line)
-        except json.JSONDecodeError as exc:
-            _write(_error_response(None, PARSE_ERROR, f"Parse error: {exc.msg}"))
-            continue
-        if not isinstance(msg, dict):
-            _write(_error_response(None, INVALID_REQUEST, "Invalid Request: expected object"))
-            continue
-        response = handle_message(msg)
-        if response is not None:
-            _write(response)
+            if raw_line is None:
+                _write(
+                    _error_response(
+                        None,
+                        INVALID_REQUEST,
+                        f"Invalid Request: line exceeds {MAX_LINE_CHARS} characters",
+                    )
+                )
+                continue
+            line = raw_line.strip()
+            if not line:
+                continue
+            response = _response_for_line(line)
+            if response is not None:
+                _write(response)
+        except Exception as exc:  # noqa: BLE001 - keep serving the next line
+            # Includes RecursionError/MemoryError raised outside the parse step.
+            # Report the exception type only: the text may be attacker-shaped.
+            _write(_error_response(None, INTERNAL_ERROR, f"Internal error: {type(exc).__name__}"))
 
 
 if __name__ == "__main__":

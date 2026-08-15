@@ -37,6 +37,7 @@ Apache-2.0.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
@@ -63,6 +64,11 @@ DEFAULT_HOST = _default_host()
 # Qwen-Research (non-commercial). See the module docstring.
 DEFAULT_MODEL = "qwen2.5:7b"
 DEFAULT_TIMEOUT = 120.0
+# A /api/chat answer for one document is a few KB. Cap the read so a wrong or
+# hostile endpoint cannot balloon this process's memory with an endless body.
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+
+_log = logging.getLogger(__name__)
 
 # Per-doc_type field specs: name -> human description fed into the prompt.
 # Mirrors the rule packs (rules/tax_invoice.yaml, statement.yaml, balance_sheet.yaml).
@@ -110,18 +116,22 @@ class OllamaExtractor:
     ----------
     model:   Ollama model tag (default ``qwen2.5:7b``, Apache-2.0; use
              ``qwen2.5:1.5b`` for a lighter Apache-2.0 option).
-    host:    base URL of the Ollama server (default ``http://localhost:11434``).
+    host:    base URL of the Ollama server. Defaults to ``OLLAMA_HOST`` /
+             ``http://localhost:11434``, resolved when the extractor is
+             constructed (not at import time). This is deployment
+             configuration: do not wire it to untrusted input — the document
+             text is POSTed to it and the reply is parsed back.
     timeout: socket timeout in seconds for the HTTP call.
     """
 
     def __init__(
         self,
         model: str = DEFAULT_MODEL,
-        host: str = DEFAULT_HOST,
+        host: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         self.model = model
-        self.host = host.rstrip("/")
+        self.host = (host or _default_host()).rstrip("/")
         self.timeout = timeout
 
     # --- Extractor protocol ----------------------------------------------------
@@ -177,14 +187,23 @@ class OllamaExtractor:
         )
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                body = response.read().decode("utf-8")
+                raw = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_RESPONSE_BYTES:
+                raise ValueError(
+                    f"Ollama response from {url} exceeds {MAX_RESPONSE_BYTES} bytes; "
+                    "refusing to buffer it"
+                )
+            body = raw.decode("utf-8", "replace")
         except urllib.error.HTTPError as exc:
             # Server reachable but rejected the call (e.g. model not pulled).
-            try:
-                detail = exc.read().decode("utf-8", "replace")[:500]
-            except Exception:  # noqa: BLE001 - diagnostics only
-                detail = ""
-            raise RuntimeError(f"Ollama returned HTTP {exc.code} for {url}: {detail}") from exc
+            # The upstream body is logged, never returned: it is remote content
+            # and this exception message travels back to the caller (MCP tool
+            # result), so echoing it would relay whatever that endpoint sent.
+            _log.debug("Ollama HTTP %s for %s; body suppressed", exc.code, url, exc_info=True)
+            raise RuntimeError(
+                f"Ollama returned HTTP {exc.code} for {url} (response body not shown; "
+                "enable debug logging for details)"
+            ) from exc
         except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
             reason = getattr(exc, "reason", exc)
             raise ConnectionError(
@@ -196,11 +215,19 @@ class OllamaExtractor:
         try:
             envelope = json.loads(body)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Ollama response body is not valid JSON: {body[:200]!r}") from exc
+            # Same reasoning as the HTTPError path above: the body is remote
+            # content and this message reaches the caller, so log it instead.
+            _log.debug("Ollama sent a non-JSON body: %r", body[:200])
+            raise ValueError(
+                "Ollama response body is not valid JSON (body not shown; see debug log)"
+            ) from exc
         message = envelope.get("message") if isinstance(envelope, dict) else None
         content = message.get("content") if isinstance(message, dict) else None
         if not isinstance(content, str) or not content.strip():
-            raise ValueError(f"Ollama response has no message content: {body[:200]!r}")
+            _log.debug("Ollama envelope had no message content: %r", body[:200])
+            raise ValueError(
+                "Ollama response has no message content (body not shown; see debug log)"
+            )
         return content
 
     # --- response parsing ------------------------------------------------------
@@ -210,8 +237,9 @@ class OllamaExtractor:
         try:
             data = json.loads(content)
         except json.JSONDecodeError as exc:
+            _log.debug("model returned non-JSON content: %r", content[:200])
             raise ValueError(
-                f"model did not return valid JSON (content starts: {content[:200]!r})"
+                "model did not return valid JSON (content not shown; see debug log)"
             ) from exc
         # Tolerate a {"fields": {...}} wrapper some models like to emit.
         if isinstance(data, dict) and isinstance(data.get("fields"), dict):

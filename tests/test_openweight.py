@@ -2,7 +2,9 @@
 
 Covers: happy-path parsing (incl. request payload shape), scalar/missing field
 tolerance, invalid model JSON, malformed server envelope, server-down
-ConnectionError, HTTP errors, unknown doc_type, and gate integration.
+ConnectionError, HTTP errors, unknown doc_type, and gate integration — plus the
+response-handling guards: the body read is size-capped and an upstream error
+body is never relayed back to the caller.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from groundextract import Verdict, load_rule_pack, run_gate
-from groundextract.llm import Extractor, OllamaExtractor
+from groundextract.llm import Extractor, OllamaExtractor, openweight
 
 RULES = Path(__file__).resolve().parent.parent / "rules" / "tax_invoice.yaml"
 
@@ -54,8 +56,10 @@ class _FakeResponse:
     def __init__(self, body: bytes) -> None:
         self._body = body
 
-    def read(self) -> bytes:
-        return self._body
+    def read(self, amt: int | None = None) -> bytes:
+        # http.client.HTTPResponse.read(amt) semantics: the client reads a
+        # bounded number of bytes, never "whatever the server sends".
+        return self._body if amt is None else self._body[:amt]
 
     def __enter__(self) -> _FakeResponse:
         return self
@@ -91,6 +95,7 @@ def test_unknown_doc_type_raises_before_any_network():
 
 
 def test_happy_path_parses_values_and_sends_expected_payload(monkeypatch):
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)  # assert on the built-in default
     calls: list = []
     _patch_urlopen(monkeypatch, _envelope(GOOD_CONTENT), calls)
 
@@ -211,6 +216,8 @@ def test_envelope_without_message_content_raises_valueerror(monkeypatch):
 
 
 def test_server_down_raises_clear_connectionerror(monkeypatch):
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)  # assert on the built-in default
+
     def fake_urlopen(request, timeout=None):
         raise urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
 
@@ -227,5 +234,61 @@ def test_http_error_raises_runtimeerror_with_status(monkeypatch):
         )
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-    with pytest.raises(RuntimeError, match="404"):
+    with pytest.raises(RuntimeError, match="404") as excinfo:
         OllamaExtractor().extract(DOC, doc_type="tax_invoice")
+    # The upstream body is remote content and this message reaches the caller
+    # (MCP tool result), so it must never be relayed back.
+    assert "model not found" not in str(excinfo.value)
+
+
+def test_error_body_is_never_relayed_to_the_caller(monkeypatch):
+    # A misconfigured/hostile endpoint answering with credentials-looking text
+    # must not have that text handed back through the exception message.
+    secret = "AKIAEXAMPLESECRETTOKEN"
+
+    def fake_urlopen(request, timeout=None):
+        raise urllib.error.HTTPError(
+            request.full_url, 500, "Server Error", None, io.BytesIO(secret.encode())
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(RuntimeError) as excinfo:
+        OllamaExtractor().extract(DOC, doc_type="tax_invoice")
+    assert secret not in str(excinfo.value)
+
+
+def test_response_read_is_size_capped(monkeypatch):
+    # The client must bound what it buffers instead of reading an endless body.
+    monkeypatch.setattr(openweight, "MAX_RESPONSE_BYTES", 32)
+    calls: list = []
+    _patch_urlopen(monkeypatch, _envelope(GOOD_CONTENT), calls)
+
+    with pytest.raises(ValueError, match="exceeds"):
+        OllamaExtractor().extract(DOC, doc_type="tax_invoice")
+
+
+def test_response_within_cap_is_read_with_a_bound(monkeypatch):
+    reads: list = []
+
+    class _RecordingResponse(_FakeResponse):
+        def read(self, amt: int | None = None) -> bytes:
+            reads.append(amt)
+            return super().read(amt)
+
+    def fake_urlopen(request, timeout=None):
+        return _RecordingResponse(_envelope(GOOD_CONTENT))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    values = OllamaExtractor().extract(DOC, doc_type="tax_invoice")
+
+    assert [v.field for v in values] == ["supply", "vat", "total"]
+    assert reads and all(amt is not None for amt in reads)  # never an unbounded read()
+
+
+def test_host_default_follows_ollama_host_env_at_construction(monkeypatch):
+    # Resolved per instance, not frozen at import time, so a server that sets
+    # OLLAMA_HOST after importing the module still points where it configured.
+    monkeypatch.setenv("OLLAMA_HOST", "10.1.2.3:11500")
+    assert OllamaExtractor().host == "http://10.1.2.3:11500"
+    monkeypatch.delenv("OLLAMA_HOST")
+    assert OllamaExtractor().host == "http://localhost:11434"
