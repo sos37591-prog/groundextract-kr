@@ -79,7 +79,7 @@ def build_fixture(values: list[ExtractedValue], doc_text: str = _DOC) -> dict:
     fields = run_gate(values, doc_text, pack)
     return {
         "doc_text": doc_text,
-        "summary": summarize(fields),
+        "summary": summarize(fields, pack),
         "fields": [f.to_dict() for f in fields],
     }
 

@@ -158,18 +158,31 @@ def evaluate_rule(rule: Rule, env: dict[str, float]) -> Check:
         return Check(name=rule.name, passed=False, detail=f"cannot evaluate rule ({e})")
 
 
-def evaluate_pack(pack: RulePack, env: dict[str, float]) -> list[Check]:
-    """Evaluate every rule that applies to this document.
+def evaluate_pack_with_fields(
+    pack: RulePack, env: dict[str, float]
+) -> list[tuple[Check, set[str]]]:
+    """Evaluate the applicable rules, pairing each Check with the fields it references.
+
+    The gate needs both halves together — the verdict *and* which fields the
+    rule reached — so they are produced in a single pass and cannot drift apart
+    (an earlier version zipped two separately filtered lists).
 
     A rule applies only when *all* of its referenced fields are present in
     ``env`` (so an optional invariant like "supply == sum(items)" is simply not
-    checked when the line items weren't extracted, rather than failing).
+    checked when the line items weren't extracted, rather than failing). A
+    field that ends up with **no** applicable rule is not thereby trustworthy:
+    see the fail-closed guard in :func:`groundextract.gate.run_gate`.
     """
-    checks: list[Check] = []
+    evaluated: list[tuple[Check, set[str]]] = []
     for rule in pack.rules:
         if _rule_applies(rule, env):
-            checks.append(evaluate_rule(rule, env))
-    return checks
+            evaluated.append((evaluate_rule(rule, env), _referenced_fields(rule)))
+    return evaluated
+
+
+def evaluate_pack(pack: RulePack, env: dict[str, float]) -> list[Check]:
+    """Evaluate every rule that applies to this document (checks only)."""
+    return [check for check, _fields in evaluate_pack_with_fields(pack, env)]
 
 
 def _referenced_fields(rule: Rule) -> set[str]:
@@ -193,4 +206,8 @@ def _rule_applies(rule: Rule, env: dict[str, float]) -> bool:
     # Apply only when the rule is fully evaluable (all fields present). This
     # keeps optional invariants (e.g. per-item sums) from failing when those
     # line items simply weren't part of the extraction.
+    #
+    # NOTE: "no rule applied" must never be read as "nothing was wrong". The
+    # gate treats a numeric value that no rule reached as UNVERIFIED and
+    # discards it (fail-closed); this filter only decides what gets *run*.
     return bool(ref) and ref.issubset(env)

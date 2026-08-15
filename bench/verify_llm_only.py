@@ -45,13 +45,14 @@ def main() -> int:
         print("FAIL: no values extracted")
         return 1
 
-    fields = run_gate(values, DOC, load_rule_pack(ROOT / "rules" / "tax_invoice.yaml"))
+    pack = load_rule_pack(ROOT / "rules" / "tax_invoice.yaml")
+    fields = run_gate(values, DOC, pack)
     print("=== GATE ===")
     for f in fields:
         print(f"  {f.field:7} verdict={f.verdict.value} conf={f.confidence}")
         for c in f.failed_checks:
             print(f"      ! {c.name}: {c.detail}")
-    print("summary:", summarize(fields))
+    print("summary:", summarize(fields, pack))
     ok = all(f.verdict is Verdict.VERIFIED for f in fields)
     print("RESULT:", "PASS" if ok else "PARTIAL/FAIL")
     return 0 if ok else 1

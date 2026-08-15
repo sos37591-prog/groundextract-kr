@@ -10,7 +10,9 @@ window.GEK_DOCS = [
         "total": 3,
         "verified": 3,
         "discarded": 0,
-        "ungrounded": 0
+        "ungrounded": 0,
+        "rule_pack": "tax_invoice",
+        "rules_applied": 2
       },
       "fields": [
         {
@@ -62,7 +64,9 @@ window.GEK_DOCS = [
         "total": 3,
         "verified": 0,
         "discarded": 3,
-        "ungrounded": 1
+        "ungrounded": 1,
+        "rule_pack": "tax_invoice",
+        "rules_applied": 2
       },
       "fields": [
         {
@@ -150,7 +154,9 @@ window.GEK_DOCS = [
         "total": 6,
         "verified": 6,
         "discarded": 0,
-        "ungrounded": 0
+        "ungrounded": 0,
+        "rule_pack": "balance_sheet",
+        "rules_applied": 3
       },
       "fields": [
         {
@@ -244,7 +250,9 @@ window.GEK_DOCS = [
         "total": 6,
         "verified": 3,
         "discarded": 3,
-        "ungrounded": 0
+        "ungrounded": 0,
+        "rule_pack": "balance_sheet",
+        "rules_applied": 3
       },
       "fields": [
         {

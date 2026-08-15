@@ -79,12 +79,24 @@ def test_happy_path_all_verified():
 
     assert all(f.verdict is Verdict.VERIFIED for f in fields)
     assert all(f.confidence == 1.0 for f in fields)
-    assert summarize(fields) == {
+    assert summarize(fields, _pack()) == {
         "total": 3,
         "verified": 3,
         "discarded": 0,
         "ungrounded": 0,
+        # the caller can see verification actually ran: two invariants applied
+        # (the per-item sum rule needs line items, which aren't extracted here)
+        "rule_pack": "tax_invoice",
+        "rules_applied": 2,
     }
+
+
+def test_summarize_reports_when_no_arithmetic_ran():
+    values = [ExtractedValue("supply", "1,000,000원", 1_000_000, "공급가액  1,000,000원")]
+    summary = summarize(run_gate(values, DOC, None), None)
+    assert summary["rule_pack"] is None
+    assert summary["rules_applied"] == 0
+    assert summary["verified"] == 0  # nothing verified it, so nothing is verified
 
 
 # --- gate: numeric hallucination (ungrounded) ----------------------------------
@@ -147,6 +159,115 @@ def test_rule_violation_discards_referenced_fields():
     # total is grounded and only appears in `total = supply + vat`
     # (1,200,000 == 1,000,000 + 200,000), which holds -> total stays verified.
     assert fields["total"].verdict is Verdict.VERIFIED
+
+
+# --- gate: fail-closed when no arithmetic rule reaches a number ----------------
+#
+# Regression table for the "0 rules applied => vacuously verified" bypass.
+# The scenario is a field swap: 250,000원 really is printed on the document (as
+# a unit price), so grounding PASSES and only arithmetic can catch it being
+# reported as the VAT. If the arithmetic never runs, a wrong number sails
+# through — so "no rule ran" must fail, never pass.
+
+SWAP_DOC = (
+    "전자세금계산서\n"
+    "품목 단가  250,000원\n"
+    "공급가액  1,000,000원\n"
+    "세액        100,000원\n"
+    "합계금액  1,100,000원\n"
+)
+
+
+def _swap_values(with_number: bool = True):
+    """supply/total correct, vat swapped to a real-but-wrong figure."""
+    rows = [
+        ("supply", "1,000,000원", 1_000_000, "공급가액  1,000,000원"),
+        ("vat", "250,000원", 250_000, "품목 단가  250,000원"),  # field swap
+        ("total", "1,100,000원", 1_100_000, "합계금액  1,100,000원"),
+    ]
+    return [
+        ExtractedValue(f, raw, num if with_number else None, quote) for f, raw, num, quote in rows
+    ]
+
+
+def _pack_named(doc_type: str):
+    return load_rule_pack(RULES.parent / f"{doc_type}.yaml")
+
+
+def test_field_swap_is_caught_with_the_matching_rule_pack():
+    fields = {f.field: f for f in run_gate(_swap_values(), SWAP_DOC, _pack())}
+    assert all(f.grounded for f in fields.values())  # every figure is on the document
+    assert all(f.verdict is Verdict.DISCARDED for f in fields.values())
+    assert any(
+        c.name == "vat_equals_supply_x_10pct" and not c.passed for c in fields["vat"].checks
+    )
+
+
+def test_missing_rule_pack_discards_numbers_instead_of_verifying_them():
+    # No pack => nothing arithmetic ran. `all([])` is True, which used to make
+    # every grounded number "verified" without any verification.
+    fields = run_gate(_swap_values(), SWAP_DOC, None)
+    assert all(f.verdict is Verdict.DISCARDED for f in fields)
+    for f in fields:
+        assert any(c.name == "rules_applied" and not c.passed for c in f.checks)
+        assert f.confidence == 0.0
+
+
+def test_rule_pack_for_another_doc_type_does_not_verify_these_fields():
+    # Valid packs, wrong document type: their rules reference debit_total /
+    # total_assets etc., so not one of them applies to supply/vat/total.
+    for doc_type in ("statement", "balance_sheet"):
+        fields = run_gate(_swap_values(), SWAP_DOC, _pack_named(doc_type))
+        assert all(f.verdict is Verdict.DISCARDED for f in fields), doc_type
+        assert all(
+            any(c.name == "rules_applied" and not c.passed for c in f.checks) for f in fields
+        ), doc_type
+
+
+def test_number_omitted_is_still_arithmetically_verified():
+    # `number` is optional in the MCP value schema, so an ordinary client may
+    # leave it out. That must not skip the arithmetic: the number is parsed
+    # from `raw` (the same string grounding checks) and the rules still fire.
+    fields = {f.field: f for f in run_gate(_swap_values(with_number=False), SWAP_DOC, _pack())}
+    assert all(f.value.number is None for f in fields.values())
+    assert all(f.verdict is Verdict.DISCARDED for f in fields.values())
+    assert any(
+        c.name == "vat_equals_supply_x_10pct" and not c.passed for c in fields["vat"].checks
+    )
+
+
+def test_number_omitted_without_rules_is_discarded_too():
+    fields = run_gate(_swap_values(with_number=False), SWAP_DOC, None)
+    assert all(f.verdict is Verdict.DISCARDED for f in fields)
+    assert all(any(c.name == "rules_applied" and not c.passed for c in f.checks) for f in fields)
+
+
+def test_correct_extraction_still_verifies_without_the_number_field():
+    # Fail-closed must not mean "always closed": the same client that omits
+    # `number` gets its correct figures verified.
+    values = [
+        ExtractedValue("supply", "1,000,000원", None, "공급가액  1,000,000원"),
+        ExtractedValue("vat", "100,000원", None, "세액        100,000원"),
+        ExtractedValue("total", "1,100,000원", None, "합계금액  1,100,000원"),
+    ]
+    fields = run_gate(values, DOC, _pack())
+    assert all(f.verdict is Verdict.VERIFIED for f in fields)
+
+
+def test_textual_field_needs_no_arithmetic_rule():
+    # A value carrying no number (상호·품목 등) has no invariant to satisfy —
+    # grounding alone decides it, otherwise the gate would discard every
+    # non-numeric field ever extracted.
+    doc = "상호 주식회사 가나다\n공급가액  1,000,000원\n"
+    values = [
+        ExtractedValue("supplier_name", "주식회사 가나다", None, "상호 주식회사 가나다"),
+        ExtractedValue("buyer_name", "주식회사 라마바", None, "상호 주식회사 라마바"),
+    ]
+    fields = {f.field: f for f in run_gate(values, doc, _pack())}
+    assert fields["supplier_name"].verdict is Verdict.VERIFIED
+    assert not any(c.name == "rules_applied" for c in fields["supplier_name"].checks)
+    # ...and an invented company name is still discarded on grounding alone
+    assert fields["buyer_name"].verdict is Verdict.DISCARDED
 
 
 def test_sum_rule_when_items_present():

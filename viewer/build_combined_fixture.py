@@ -42,7 +42,7 @@ from groundextract.rules import load_rule_pack  # noqa: E402
 FIX = ROOT / "viewer" / "fixtures" / "image_data.js"
 
 
-def _emit(fields, box_by_field: dict, label_by_field: dict) -> dict:
+def _emit(fields, box_by_field: dict, label_by_field: dict, pack=None) -> dict:
     out = []
     for f in fields:
         out.append({
@@ -54,7 +54,7 @@ def _emit(fields, box_by_field: dict, label_by_field: dict) -> dict:
             "box": box_by_field.get(f.field),
             "failed": [{"name": c.name, "detail": c.detail} for c in f.failed_checks],
         })
-    return {"summary": summarize(fields), "fields": out}
+    return {"summary": summarize(fields, pack), "fields": out}
 
 
 # --------------------------------------------------------------------------- #
@@ -101,7 +101,7 @@ def build_invoice() -> dict:
                 vals.append(ExtractedValue(fid, vat_raw, float(vat_num)))
             else:
                 vals.append(ExtractedValue(fid, f"{num:,}원", float(num)))
-        return _emit(run_gate(vals, INV_TEXT, pack), boxes, labels)
+        return _emit(run_gate(vals, INV_TEXT, pack), boxes, labels, pack)
 
     clean = run(15_000, "15,000원")
     injected = run(50_000, "50,000원")  # hallucinated VAT — not on the invoice
@@ -178,7 +178,7 @@ def build_balance() -> dict:
                 vals.append(ExtractedValue(fid, noncur_raw, float(noncur_num)))
             else:
                 vals.append(ExtractedValue(fid, f"{num:,}원", float(num)))
-        return _emit(run_gate(vals, text, pack), boxes, labels)
+        return _emit(run_gate(vals, text, pack), boxes, labels, pack)
 
     clean = run(39_431_995, "39,431,995원", real_text)
     injected = run(39_431_895, "39,431,895원", real_text.replace("39,431,995", "39,431,895"))

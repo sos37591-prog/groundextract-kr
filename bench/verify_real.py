@@ -86,7 +86,7 @@ def main() -> int:
         print(f"      {mark}{f.field:7} verdict={f.verdict.value} conf={f.confidence}")
         for c in f.failed_checks:
             print(f"          ! {c.name}: {c.detail}")
-    print(f"      summary: {summarize(fields)}")
+    print(f"      summary: {summarize(fields, pack)}")
     positive_ok = all(f.verdict is Verdict.VERIFIED for f in fields)
 
     # -- 5. negative control: tampered VAT must die ------------------------------
