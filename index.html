@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GroundExtract-KR · 데모 뷰어</title>
+<meta name="description" content="AI가 규제문서에서 추출한 모든 숫자에 원문 근거와 산술 정합성을 강제하고, 근거 없는 값·규칙 위반 값을 confidence 0으로 자동 폐기하는 오픈소스 게이트. NumHall-KR 벤치마크 숫자 환각률 19.9% → 0.0%." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1020'/%3E%3Cpath d='M6.5 17 13 23.5 25.5 9.5' fill='none' stroke='%2322c55e' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="GroundExtract-KR" />
+<meta property="og:locale" content="ko_KR" />
+<meta property="og:url" content="https://sos37591-prog.github.io/groundextract-kr/" />
+<meta property="og:title" content="GroundExtract-KR · 근거 없는 숫자는 confidence 0으로 자동 폐기" />
+<meta property="og:description" content="한국 규제문서(세금계산서·재무제표)에서 AI가 추출한 모든 숫자에 ①원문 verbatim 근거와 ②도메인 산술(부가세=공급가×10%, 자산=부채+자본)을 강제하는 값-수준 신뢰성 게이트. NumHall-KR 벤치마크 46문서·146필드에서 숫자 환각률 19.9% → 0.0%, 자동폐기 재현율 100%. 데모에서 환각을 직접 주입해 폐기 과정을 확인할 수 있습니다. Apache-2.0 오픈소스." />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="GroundExtract-KR · 근거 없는 숫자는 confidence 0으로 자동 폐기" />
+<meta name="twitter:description" content="AI 추출 숫자에 원문 근거 + 산술 정합성을 강제하는 게이트. 숫자 환각률 19.9% → 0.0%(재현율 100%). 브라우저에서 환각을 주입해 보세요." />
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2e; --line:#26304a; --txt:#e6ebf5; --mut:#8b97b3;
+    --green:#22c55e; --green-fill:rgba(34,197,94,.16); --green-soft:rgba(34,197,94,.10);
+    --red:#ef4444; --red-fill:rgba(239,68,68,.18); --red-soft:rgba(239,68,68,.10);
+    --accent:#38bdf8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b1020,#0d1424);color:var(--txt);
+    font-family:"Malgun Gothic","맑은 고딕",system-ui,sans-serif}
+  header{padding:20px 28px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  h1{font-size:20px;margin:0}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--mut);font-size:13px;margin-top:4px;flex-basis:100%}
+  .badges{display:flex;gap:10px;margin-left:auto;align-items:center}
+  .badge{padding:6px 12px;border-radius:999px;font-weight:700;font-size:13px;border:1px solid;
+    white-space:nowrap}
+  .b-green{color:var(--green);border-color:var(--green);background:var(--green-soft)}
+  .b-red{color:var(--red);border-color:var(--red);background:var(--red-soft)}
+  .state{font-size:12px;color:var(--mut);padding:6px 10px;border:1px solid var(--line);
+    border-radius:8px;white-space:nowrap}
+  #toggle{cursor:pointer;padding:8px 16px;border-radius:999px;border:1px solid var(--accent);
+    background:#0e1a2e;color:var(--txt);font-weight:700;font-size:13px;white-space:nowrap}
+  #toggle.on{background:var(--red);border-color:var(--red);color:#fff}
+  .doctabs{display:flex;gap:8px;margin:0 0 12px}
+  .doctab{cursor:pointer;padding:7px 14px;border-radius:9px;border:1px solid var(--line);
+    background:#0e1626;color:var(--mut);font-weight:700;font-size:13px;white-space:nowrap}
+  .doctab.active{color:var(--txt);border-color:var(--accent);background:#0e1a2e;
+    box-shadow:inset 0 -2px 0 var(--accent)}
+  .story{color:var(--accent);font-size:12.5px;margin:0 0 6px;min-height:16px}
+  .source{color:var(--mut);font-size:11.5px;margin:0 0 10px;min-height:14px}
+  .source b{color:#9fb0d0;font-weight:600}
+  /* ?tip=<field> pins one tooltip open for screenshots/recording */
+  .box.red.pinned .tip{display:block}
+  main{display:flex;gap:22px;padding:22px 28px;align-items:flex-start;flex-wrap:wrap}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h2{font-size:14px;margin:0 0 12px;color:var(--mut);font-weight:600}
+  .doc{flex:1 1 460px;min-width:360px}
+  /* overflow는 hidden이 아니다 — 모바일에서 축소된 문서 밖으로 나가는 폐기 사유 말풍선이
+     잘리면 안 되기 때문. 이미지 모서리는 img 자체의 radius로 처리한다 */
+  .imgwrap{position:relative;line-height:0;border-radius:8px;border:1px solid var(--line)}
+  .imgwrap img{width:100%;display:block;border-radius:7px}
+  .box{position:absolute;border:2.5px solid var(--green);background:var(--green-fill);
+    border-radius:4px;transition:border-color .5s ease,background .5s ease;cursor:default}
+  .box.red{border-color:var(--red);background:var(--red-fill)}
+  /* .imgwrap의 line-height:0이 상속되지 않도록 라벨류는 line-height를 명시한다 */
+  .box .chip{position:absolute;left:0;top:-20px;font-size:11px;font-weight:700;line-height:1.5;
+    color:#04110a;background:var(--green);padding:1px 6px;border-radius:4px;white-space:nowrap;
+    transition:background .5s ease}
+  .box.red .chip{background:var(--red);color:#fff;text-decoration:line-through}
+  .box .tip{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:9;
+    width:290px;max-width:100vw;background:#0a1120;border:1px solid var(--red);border-radius:8px;
+    padding:8px 10px;font-size:12px;color:var(--txt);line-height:1.5;
+    box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .box.red:hover .tip{display:block}
+  /* 폐기 사유가 있는 박스는 클릭(터치)으로도 열린다 — .pinned 토글 */
+  .box.red.hastip{cursor:pointer}
+  .box .tip b{color:var(--red)}
+  .panel{flex:1 1 380px;min-width:320px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;font-size:12px}
+  .fname{font-weight:700}.fkey{color:var(--mut);font-size:11px}
+  .v-ok{color:var(--green);font-weight:700}
+  .v-no{color:var(--red);font-weight:700}
+  tr.discarded .val{color:var(--red);text-decoration:line-through}
+  .pill{padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid;
+    white-space:nowrap}
+  .pill.ok{color:var(--green);border-color:var(--green);background:var(--green-soft)}
+  .pill.no{color:var(--red);border-color:var(--red);background:var(--red-soft)}
+  .foot{color:var(--mut);font-size:12px;text-align:center;padding:8px 28px 26px}
+  .hint{color:var(--mut);font-size:12px;margin-top:10px}
+  /* 환각 주입 시 문서 위에 뜨는 'AI가 읽은 틀린 값' 태그
+     line-height 필수: .imgwrap의 line-height:0을 상속하면 2px로 찌그러져 판독 불가 */
+  .box .tag{position:absolute;left:-2px;top:-21px;font-size:11px;font-weight:800;line-height:1.5;
+    white-space:nowrap;background:var(--red);color:#fff;padding:1px 7px;border-radius:5px;
+    letter-spacing:.2px;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+  /* NumHall-KR 벤치마크 카드 */
+  .bench h2{margin:22px 0 10px}
+  .bench .big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:2px 0 14px}
+  .bench .from{color:var(--red);font-weight:800;font-size:26px;
+    text-decoration:line-through;text-decoration-color:rgba(239,68,68,.7)}
+  .bench .arrow{color:var(--mut);font-size:20px}
+  .bench .to{color:var(--green);font-weight:800;font-size:32px}
+  .bench .cap{color:var(--mut);font-size:12px}
+  .bench .tiles{display:flex;gap:10px;flex-wrap:wrap}
+  .bench .tile{flex:1 1 110px;background:#0e1626;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .bench .tile .k{color:var(--mut);font-size:11px;margin-bottom:5px}
+  .bench .tile .v{font-weight:800;font-size:19px}
+  .bench .tile .v.g{color:var(--green)}
+  .bench .scale{color:var(--mut);font-size:11px;line-height:1.5;margin-top:10px}
+  .bench .scale code{color:var(--accent)}
+  .foot a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(56,189,248,.4)}
+  .foot a:hover{border-bottom-color:var(--accent)}
+  .foot .sep{color:var(--line);margin:0 6px}
+
+  /* 모바일 (≤720px): 2단 → 1단, 헤더 줄바꿈, 최소폭 해제로 가로 오버플로 제거 */
+  @media (max-width:720px){
+    header{padding:14px 16px;gap:10px}
+    h1{font-size:18px}
+    .sub{font-size:12px;margin-top:2px}
+    .badges{margin-left:0;flex-wrap:wrap;gap:8px;width:100%}
+    main{padding:16px;gap:16px}
+    .card{padding:13px}
+    .doc,.panel{flex:1 1 100%;min-width:0;width:100%}
+    .doctabs{flex-wrap:wrap}
+    table{font-size:12px}
+    th,td{padding:8px 5px}
+    .fname{word-break:keep-all}
+    .bench .to{font-size:27px}
+    .bench .from{font-size:22px}
+    .bench .tile{flex:1 1 100%}
+    .foot{padding:8px 16px 24px;line-height:1.9}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>GroundExtract-KR <span>데모 뷰어</span></h1>
+    <div class="sub">한국 규제문서(세금계산서·재무제표) 위에서 — 근거 없는 숫자·산술 위반 값을 confidence 0으로 자동 폐기</div>
+  </div>
+  <div class="badges">
+    <span class="badge b-green">VERIFIED <b id="nOk">0</b></span>
+    <span class="badge b-red">DISCARDED <b id="nNo">0</b></span>
+    <span class="state" id="state">정상 문서 (clean)</span>
+    <button id="toggle">● 환각 주입</button>
+  </div>
+</header>
+
+<main>
+  <section class="card doc">
+    <div class="doctabs" id="doctabs"></div>
+    <h2>규제문서 원본 (bbox 검증 오버레이)</h2>
+    <div class="story" id="story"></div>
+    <div class="source" id="source"></div>
+    <div class="imgwrap" id="imgwrap">
+      <img id="img" alt="regulatory document" />
+    </div>
+    <div class="hint">초록 = 근거·산술 검증 통과 / 빨강 = 자동 폐기. <b style="color:var(--red)">빨강 태그</b> = AI가 추출한 <b>틀린 값</b>(원본과 대조). 빨강 박스에 마우스를 올리거나 탭하면 폐기 사유가 표시됩니다.</div>
+  </section>
+
+  <section class="card panel">
+    <h2>추출 필드 판정</h2>
+    <table>
+      <thead><tr><th>필드</th><th>추출값</th><th>판정</th><th>신뢰도</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div class="bench">
+      <h2>측정된 신뢰성 · NumHall-KR 벤치마크</h2>
+      <div class="big">
+        <span class="from">19.9%</span>
+        <span class="arrow">→</span>
+        <span class="to">0.0%</span>
+        <span class="cap">숫자 환각률 (게이트 전 → 후)</span>
+      </div>
+      <div class="tiles">
+        <div class="tile"><div class="k">자동폐기 재현율</div><div class="v g">100%</div></div>
+        <div class="tile"><div class="k">근거정확도</div><div class="v">64.4%</div></div>
+        <div class="tile"><div class="k">자동폐기 정밀도</div><div class="v">35.8%</div></div>
+      </div>
+      <div class="scale">146필드 중 라벨 환각 29건 — 게이트 후 누출 <b style="color:var(--green)">0건</b>(재현율 100%) · 46문서 결정적 재현: <code>python -m groundextract.bench</code></div>
+    </div>
+  </section>
+</main>
+<div class="foot">
+  GroundExtract-KR · 2026 공개SW 개발자대회 자유과제(AI)<span class="sep">·</span><a
+    href="https://github.com/sos37591-prog/groundextract-kr" target="_blank"
+    rel="noopener noreferrer">GitHub 저장소</a><span class="sep">·</span><a
+    href="https://github.com/sos37591-prog/groundextract-kr/blob/main/LICENSE" target="_blank"
+    rel="noopener noreferrer">Apache-2.0 라이선스</a>
+</div>
+
+<script src="fixtures/image_data.js"></script>
+<script>
+  const DOCS = window.GEK_DOCS;
+  const img = document.getElementById("img");
+  const wrap = document.getElementById("imgwrap");
+  // Deep-linkable state: ?doc=<id|index>&injected=1&tip=<field>
+  // Lets you share (or capture) an exact scene, e.g. ?doc=balance_sheet&injected=1
+  const Q = new URLSearchParams(location.search);
+  const qDoc = Q.get("doc");
+  let docIndex = 0;
+  if (qDoc !== null) {
+    const byId = DOCS.findIndex(d => d.id === qDoc);
+    docIndex = byId >= 0 ? byId : Math.min(Math.max(parseInt(qDoc, 10) || 0, 0), DOCS.length - 1);
+  }
+  let injected = ["1", "true", "yes"].includes((Q.get("injected") || "").toLowerCase());
+  const pinField = Q.get("tip");
+  const curDoc = () => DOCS[docIndex];
+  const CB = "?t=" + Date.now();   // per-load cache-bust so rebuilt images never serve stale
+  img.src = curDoc().image + CB;
+
+  const pct = (v, total) => (v / total * 100) + "%";
+
+  // 문서에서 추출된 텍스트(제목·값·출처·검증 사유)는 신뢰할 수 없다 —
+  // 이 뷰어는 그런 텍스트를 절대 innerHTML로 넣지 않고 textContent/DOM 조립만 쓴다.
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+
+  function renderTabs(){
+    const bar = document.getElementById("doctabs");
+    bar.textContent = "";
+    DOCS.forEach((d, i) => {
+      const b = el("button", "doctab" + (i === docIndex ? " active" : ""), d.title);
+      b.addEventListener("click", () => {
+        docIndex = i;
+        injected = false;            // 문서 전환 시 정상(clean) 상태로 초기화
+        img.src = curDoc().image + CB;
+        renderTabs();
+        render();
+      });
+      bar.appendChild(b);
+    });
+  }
+
+  // clean일 때는 다음 행동(환각 주입)을 유도하고, injected일 때만 사고 설명을 쓴다.
+  // clean 화면에서 화면에 없는 환각 값을 설명하던 자기모순을 없앤다.
+  function storyLine(D, set){
+    if (injected) return D.story || "";
+    const n = (set.summary && set.summary.total) || set.fields.length;
+    return `지금은 정상 문서입니다 — ${n}개 값 모두 원문 근거·산술 검증 통과. ` +
+      `오른쪽 위 '● 환각 주입'을 눌러 AI 환각을 넣어보세요.`;
+  }
+
+  // 폐기 사유 말풍선이 문서 밖으로 나가 잘리지 않도록 좌우 위치를 보정 (모바일 필수).
+  // display:none 상태에서는 폭을 못 재므로 잠깐 펼쳐 측정한 뒤 되돌린다(페인트 전에 끝남).
+  function clampTips(){
+    const wr = wrap.getBoundingClientRect();
+    if (!wr.width) return;
+    wrap.querySelectorAll(".tip").forEach(tip => {
+      tip.style.left = "0px";                       // 기준 위치에서 실제 폭을 잰다
+      tip.style.width = Math.min(290, wr.width - 10) + "px";   // 좁은 화면에선 문서 폭에 맞춘다
+      const shown = getComputedStyle(tip).display !== "none";
+      if (!shown) tip.style.display = "block";
+      const tr = tip.getBoundingClientRect();
+      if (!shown) tip.style.display = "";
+      if (!tr.width) return;
+      // 오른쪽으로 넘치면 왼쪽으로 당기되, 문서 왼쪽 끝보다 더 나가진 않게
+      const shift = Math.max(wr.left + 2 - tr.left, Math.min(0, wr.right - 2 - tr.right));
+      if (shift) tip.style.left = Math.round(shift) + "px";
+    });
+  }
+
+  function render(){
+    const D = curDoc();
+    const set = injected ? D.injected : D.clean;
+    const cleanVal = {};                         // 정상 상태 값 — 실제로 바뀐 필드 판별용
+    for (const cf of D.clean.fields) cleanVal[cf.field] = cf.value;
+    document.getElementById("story").textContent = storyLine(D, set);
+    const src = document.getElementById("source");
+    src.textContent = "";
+    if (D.source) src.append(el("b", "", "문서 출처"), " · " + D.source);
+    document.getElementById("nOk").textContent = set.summary.verified;
+    document.getElementById("nNo").textContent = set.summary.discarded;
+    document.getElementById("state").textContent = injected ? "환각 주입됨 (injected)" : "정상 문서 (clean)";
+    document.getElementById("toggle").classList.toggle("on", injected);
+
+    wrap.querySelectorAll(".box").forEach(e => e.remove());
+    for (const f of set.fields){
+      if (!f.box) continue;
+      const [x0,y0,x1,y1] = f.box;
+      const b = document.createElement("div");
+      b.className = "box" + (f.verdict === "discarded" ? " red" : "");
+      b.style.left = pct(x0, D.width);
+      b.style.top = pct(y0, D.height);
+      b.style.width = pct(x1 - x0, D.width);
+      b.style.height = pct(y1 - y0, D.height);
+      if (f.verdict === "discarded"){
+        // 실제로 값이 바뀐(오독·환각) 필드에만 태그 — 산술로 연쇄 폐기된 형제엔 태그 없음
+        if (injected && cleanVal[f.field] !== undefined && f.value !== cleanVal[f.field]){
+          const tag = document.createElement("div");   // 문서 위에 AI가 읽은 틀린 값 표시
+          tag.className = "tag";
+          tag.textContent = "✕ AI: " + f.value;
+          b.appendChild(tag);
+        }
+        if (f.failed.length){
+          if (pinField && f.field === pinField) b.classList.add("pinned");
+          b.classList.add("hastip");
+          const tip = el("div", "tip");
+          tip.append(el("b", "", "자동 폐기"), " · confidence 0");
+          for (const c of f.failed){
+            tip.appendChild(document.createElement("br"));
+            tip.append("✕ " + c.name + ": " + c.detail);
+          }
+          b.appendChild(tip);
+          // 터치 기기에는 hover가 없다 — 클릭으로 열고, 다시 누르면 닫는다
+          b.addEventListener("click", ev => {
+            ev.stopPropagation();
+            const wasOpen = b.classList.contains("pinned");
+            wrap.querySelectorAll(".box.pinned").forEach(o => o.classList.remove("pinned"));
+            if (!wasOpen) b.classList.add("pinned");
+          });
+        }
+      }
+      wrap.appendChild(b);
+    }
+
+    const tbody = document.getElementById("rows");
+    tbody.textContent = "";
+    for (const f of set.fields){
+      const ok = f.verdict === "verified";
+      const tr = el("tr", ok ? "" : "discarded");
+      const name = el("td");
+      name.append(el("div", "fname", f.label), el("div", "fkey", f.field));
+      const pill = el("td");
+      pill.appendChild(el("span", "pill " + (ok ? "ok" : "no"), ok ? "검증됨" : "폐기"));
+      tr.append(
+        name,
+        el("td", "val", f.value),
+        pill,
+        el("td", ok ? "v-ok" : "v-no", Number(f.confidence).toFixed(2))
+      );
+      tbody.appendChild(tr);
+    }
+    clampTips();
+  }
+
+  document.getElementById("toggle").addEventListener("click", () => { injected = !injected; render(); });
+  // 박스 밖을 누르면 열려 있던 폐기 사유를 닫는다
+  document.addEventListener("click", () => {
+    wrap.querySelectorAll(".box.pinned").forEach(o => o.classList.remove("pinned"));
+  });
+  window.addEventListener("resize", clampTips);
+  img.addEventListener("load", clampTips);   // 이미지 로드 후 실제 폭으로 재보정
+  renderTabs();
+  render();
+</script>
+</body>
+</html>
