@@ -27,12 +27,19 @@ files without writing code.
   recall. The gate now sets aside any field a *passing* rule corroborates, then
   blames the smallest sets of the remainder that account for every violation.
 
+  Measured on its own, against the 146-field benchmark as it stood before
+  `balance_sheet` joined it later in this release:
+
   | | before | after |
   |---|---|---|
   | Auto-Discard Recall | 100.0% | **100.0%** |
   | Auto-Discard Precision | 35.8% | **63.0%** |
   | Grounded-Accuracy | 64.4% | **88.4%** |
   | Confusion | TP=29 FP=52 FN=0 TN=65 | **TP=29 FP=17 FN=0 TN=100** |
+
+  The figures this release *ships* with are the ones over the grown 218-field
+  suite — recall 100.0%, precision 59.2%, grounded-accuracy 86.7% — see the
+  `balance_sheet` entry below for why they differ.
 
   Recall is untouched by construction, not by luck: a single wrong value appears
   in *every* rule that broke, so `{that value}` is itself a minimum explanation
