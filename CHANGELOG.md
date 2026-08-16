@@ -11,6 +11,37 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
+### Added
+
+- **Fault localization.** A violated invariant names several fields but indicts
+  only some of them, and discarding all of them was the deliberate price of
+  recall. The gate now sets aside any field a *passing* rule corroborates, then
+  blames the smallest sets of the remainder that account for every violation.
+
+  | | before | after |
+  |---|---|---|
+  | Auto-Discard Recall | 100.0% | **100.0%** |
+  | Auto-Discard Precision | 35.8% | **63.0%** |
+  | Grounded-Accuracy | 64.4% | **88.4%** |
+  | Confusion | TP=29 FP=52 FN=0 TN=65 | **TP=29 FP=17 FN=0 TN=100** |
+
+  Recall is untouched by construction, not by luck: a single wrong value appears
+  in *every* rule that broke, so `{that value}` is itself a minimum explanation
+  and is always among the sets blamed — which is why ambiguity widens the blame
+  instead of narrowing it. Two assumptions come with that and are documented as
+  limits: several fields wrong at once may admit an explanation smaller than the
+  truth, and a wrong value that happens to satisfy some other invariant is
+  cleared by it.
+
+  A rule downgraded for leaning on ungrounded values verified nothing, so it is
+  **not** a violation to localize and exonerates nobody; treating it as one would
+  hand a field exactly the verdict the downgrade exists to deny. Exonerated
+  fields carry an informational `fault_localization` check naming who was blamed.
+
+  What is left is genuine ambiguity — 세액 vs 공급가액 with no line items to break
+  the tie — which needs more overlapping invariants per document, not a smarter
+  search. A single-rule pack like `statement` cannot localize at all.
+
 ### Changed
 
 - **The viewer fixture builder uses `pypdfium2` (BSD-3-Clause / Apache-2.0)

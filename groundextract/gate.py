@@ -55,6 +55,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 from collections.abc import Iterable
+from itertools import combinations
 from typing import Any
 
 from .grounding import ground_value, normalize_number_str
@@ -66,11 +67,25 @@ GROUNDING_CHECK = "grounding"
 RULES_APPLIED_CHECK = "rules_applied"
 RAW_NUMBER_CHECK = "raw_number_agreement"
 DUPLICATE_FIELD_CHECK = "duplicate_field"
+FAULT_LOCALIZATION_CHECK = "fault_localization"
 
 #: Check names produced by the gate itself rather than by a rule pack.
 _GATE_CHECKS = frozenset(
-    {GROUNDING_CHECK, RULES_APPLIED_CHECK, RAW_NUMBER_CHECK, DUPLICATE_FIELD_CHECK}
+    {
+        GROUNDING_CHECK,
+        RULES_APPLIED_CHECK,
+        RAW_NUMBER_CHECK,
+        DUPLICATE_FIELD_CHECK,
+        FAULT_LOCALIZATION_CHECK,
+    }
 )
+
+#: Ceilings on the fault-localization search. A rule pack references a handful of
+#: fields, so the real search is tiny; these only stop a pathological input from
+#: turning a combinatorial search loose. Exceeding either means "cannot localize",
+#: which falls back to blaming every field the failing rules reference.
+MAX_LOCALIZATION_CANDIDATES = 16
+MAX_LOCALIZATION_DEPTH = 3
 
 
 def value_number(value: ExtractedValue) -> float | None:
@@ -127,6 +142,57 @@ def raw_number_agreement(value: ExtractedValue) -> Check | None:
         name=RAW_NUMBER_CHECK,
         passed=True,
         detail=f"supplied number agrees with raw ({parsed!r})",
+    )
+
+
+def _localize_fault(failing: list[set[str]], cleared: set[str]) -> set[str] | None:
+    """Which fields could account for every failing rule, or ``None`` if unclear.
+
+    A violated invariant names several fields but only indicts some of them. The
+    gate used to discard all of them, which is why precision was the price of
+    recall: a hallucinated 세액 took 공급가액 and 합계금액 down with it.
+
+    Fields corroborated by a rule that *passed* are set aside first, then the
+    smallest sets of the remainder that touch every failing rule are computed —
+    the smallest explanations for what went wrong. **All** minimum-size
+    explanations are blamed together, not one chosen among them, and that is what
+    keeps recall intact for a single bad value:
+
+        A single wrong field must appear in every rule that failed (nothing else
+        changed), so ``{that field}`` is itself a minimum hitting set and is
+        therefore always among the sets returned. Blaming their union cannot drop
+        it.
+
+    Two assumptions come with that, and both are documented as limits: several
+    fields wrong at once may admit an explanation smaller than the truth, and a
+    wrong value that happens to satisfy some other invariant is cleared by it.
+    Returning ``None`` (no candidates, or a search wider than the ceilings above)
+    means the caller keeps the old blame-everything behaviour.
+    """
+    candidates = sorted(set().union(*failing) - cleared) if failing else []
+    if not candidates or len(candidates) > MAX_LOCALIZATION_CANDIDATES:
+        return None
+    for size in range(1, min(len(candidates), MAX_LOCALIZATION_DEPTH) + 1):
+        explanations = [
+            set(combo)
+            for combo in combinations(candidates, size)
+            if all(set(combo) & rule for rule in failing)
+        ]
+        if explanations:
+            return set().union(*explanations)
+    return None
+
+
+def _exonerated_check(rule_name: str, blamed: Iterable[str]) -> Check:
+    """Informational check recording a failure this field is not implicated in."""
+    culprits = ", ".join(sorted(blamed))
+    return Check(
+        name=FAULT_LOCALIZATION_CHECK,
+        passed=True,
+        detail=(
+            f"{rule_name} failed, but the inconsistency is fully explained by "
+            f"{culprits} (discarded); this field is not implicated"
+        ),
     )
 
 
@@ -224,6 +290,32 @@ def run_gate(
     rule_checks: list[tuple[Check, set[str]]] = (
         evaluate_pack_with_fields(rule_pack, env) if rule_pack is not None else []
     )
+    # A rule can end up failing for two very different reasons, and only one of
+    # them is a fault to localize:
+    #
+    #   * the invariant is **violated** — some field's number is wrong, and the
+    #     question "which one?" is worth asking;
+    #   * the invariant held but was **downgraded** because it leaned on an
+    #     ungrounded value (see :func:`_vouching_check`) — meaning it verified
+    #     nothing at all. There is no fault to pin on anyone, and exonerating a
+    #     field from it would hand it the verdict the downgrade exists to deny.
+    #
+    # So localization runs over violations only, and a downgraded rule keeps
+    # failing for every field it references.
+    vouched: list[tuple[Check, set[str], bool]] = []
+    for check, fields in rule_checks:
+        voucher = _vouching_check(check, fields, grounded)
+        vouched.append((voucher, fields, check.passed and not voucher.passed))
+
+    # Which fields a violated invariant actually indicts. Fields a *passing* rule
+    # corroborates are set aside; of the rest, the smallest explanations for every
+    # violation are blamed. `None` means the fault could not be narrowed, and the
+    # conservative reading — every field the violated rules reference — stands.
+    violations = [fields for c, fields, downgraded in vouched if not c.passed and not downgraded]
+    cleared = set().union(*[f for c, f, _ in vouched if c.passed]) if vouched else set()
+    blamed = _localize_fault(violations, cleared)
+    if blamed is None:
+        blamed = set().union(*violations) if violations else set()
 
     results: list[VerifiedField] = []
     for v, grounding in zip(values, groundings, strict=True):
@@ -235,10 +327,13 @@ def run_gate(
         if counts[v.field] > 1:
             integrity.append(_duplicate_check(v.field, counts[v.field]))
 
-        # every arithmetic rule that references this field
+        # every arithmetic rule that references this field, with a failure the
+        # localization exonerated it from recorded rather than held against it
         arithmetic = [
-            _vouching_check(check, fields, grounded)
-            for check, fields in rule_checks
+            check
+            if (check.passed or downgraded or v.field in blamed)
+            else _exonerated_check(check.name, blamed & fields)
+            for check, fields, downgraded in vouched
             if v.field in fields
         ]
         if not arithmetic and value_number(v) is not None:

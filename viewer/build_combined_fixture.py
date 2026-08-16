@@ -5,7 +5,8 @@ can switch between both real, PII-masked documents with a tab. Each doc carries
 its own clean/injected gate results and shows a *different* failure mode:
 
   • 세금계산서: a hallucinated VAT (50,000) that never appears on the invoice —
-    grounding FAILS, and the arithmetic pack poisons the linked fields.
+    grounding FAILS, and the arithmetic pack indicts it (합계금액 is spared: it
+    cannot explain both violations).
   • 재무상태표: a one-digit misread of 비유동자산 that IS present in the OCR text —
     grounding PASSES, only the cross-field ARITHMETIC invariant catches it.
 
@@ -116,7 +117,8 @@ def build_invoice() -> dict:
         "id": "tax_invoice", "title": "전자세금계산서",
         "image": "assets/tax_invoice_demo.png",
         "width": W, "height": H, "clean": clean, "injected": injected,
-        "story": "환각 세액(50,000원)은 문서에 없음 → 근거 실패 + 산술 위반으로 연쇄 폐기",
+        "story": ("환각 세액(50,000원)은 문서에 없음 → 근거 실패 + 산술 위반. "
+                  "합계금액은 두 위반을 설명하지 못하므로 폐기되지 않음"),
         "source": "비식별 캡처 (공급자·공급받는자·승인번호 마스킹 · 품목 일반화)",
     }
 
@@ -252,7 +254,8 @@ def build_balance() -> dict:
         "id": "balance_sheet", "title": "표준재무상태표",
         "image": "assets/balance_sheet_demo.png",
         "width": W, "height": H, "clean": clean, "injected": injected,
-        "story": "비유동자산 한 자리 오독은 OCR 텍스트에도 존재 → 근거 통과, 산술만 적발",
+        "story": ("비유동자산 한 자리 오독은 OCR 텍스트에도 존재 → 근거 통과, 산술만 적발. "
+                  "대차평형이 자산총계를 입증하므로 덧셈 항 2개만 폐기"),
         "source": "합성 샘플 (표준 서식 · 모든 금액 가상 · 회계 항등식 성립)",
     }
 

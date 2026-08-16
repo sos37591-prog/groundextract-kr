@@ -197,7 +197,12 @@ def _pack_named(doc_type: str):
 def test_field_swap_is_caught_with_the_matching_rule_pack():
     fields = {f.field: f for f in run_gate(_swap_values(), SWAP_DOC, _pack())}
     assert all(f.grounded for f in fields.values())  # every figure is on the document
-    assert all(f.verdict is Verdict.DISCARDED for f in fields.values())
+    # Both invariants break. `vat` and `supply` each appear in both, so either
+    # could be the liar and both are discarded; `total` appears in only one, so
+    # it cannot be the single explanation and is spared.
+    assert fields["vat"].verdict is Verdict.DISCARDED
+    assert fields["supply"].verdict is Verdict.DISCARDED
+    assert fields["total"].verdict is Verdict.VERIFIED
     assert any(
         c.name == "vat_equals_supply_x_10pct" and not c.passed for c in fields["vat"].checks
     )
@@ -230,7 +235,10 @@ def test_number_omitted_is_still_arithmetically_verified():
     # from `raw` (the same string grounding checks) and the rules still fire.
     fields = {f.field: f for f in run_gate(_swap_values(with_number=False), SWAP_DOC, _pack())}
     assert all(f.value.number is None for f in fields.values())
-    assert all(f.verdict is Verdict.DISCARDED for f in fields.values())
+    # same verdicts as when `number` is supplied — the rules fired either way
+    assert fields["vat"].verdict is Verdict.DISCARDED
+    assert fields["supply"].verdict is Verdict.DISCARDED
+    assert fields["total"].verdict is Verdict.VERIFIED
     assert any(
         c.name == "vat_equals_supply_x_10pct" and not c.passed for c in fields["vat"].checks
     )

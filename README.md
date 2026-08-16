@@ -60,18 +60,19 @@ XX vat    value=250,000원     verdict=discarded conf=0.0
        ! grounding: cited quote not found verbatim in document: '세액  250,000원'
        ! vat_equals_supply_x_10pct: 250,000 vs 100,000 (tol 1) -> diff 150,000
        ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
-XX total  value=1,100,000원   verdict=discarded conf=0.0
-       ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
-summary: {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1, "rule_pack": "tax_invoice", "rules_applied": 2}
+OK total  value=1,100,000원   verdict=verified conf=1.0
+summary: {"total": 3, "verified": 1, "discarded": 2, "ungrounded": 1, "rule_pack": "tax_invoice", "rules_applied": 2}
 ```
 
 `rule_pack` and `rules_applied` in the summary record which invariants actually ran:
 `rules_applied: 0` would mean the gate had no arithmetic to check with at all, which is a
 very different situation from "everything passed".
 
-Note that all three fields are discarded, not just the hallucinated one — the violated
-arithmetic rules reference `supply` and `total`, so the gate conservatively discards the
-siblings too. That trade-off is discussed under [Metrics](#benchmark-numhall-kr) and
+Note that `supply` goes too, and `total` does not. Both invariants break, and `vat` and
+`supply` each appear in both — arithmetic alone cannot say which of the two is lying, so
+both are discarded. `total` appears in only one of them, so it cannot be the single
+explanation for what went wrong and is spared. That narrowing is
+[fault localization](#benchmark-numhall-kr); what it cannot narrow is discussed under
 [Limitations](#limitations).
 
 This command runs that built-in demo and nothing else: it takes no document argument (pass
@@ -285,10 +286,10 @@ python -m groundextract.bench
 ```text
 === NumHall-KR benchmark ===
 fields: 146  (ground-truth bad: 29)
-confusion: TP=29 FP=52 FN=0 TN=65
+confusion: TP=29 FP=17 FN=0 TN=100
 Numeric Hallucination Rate: 19.9% (before gate)  ->  0.0% (after gate)
-Grounded-Accuracy:          64.4%
-Auto-Discard Precision:     35.8%
+Grounded-Accuracy:          88.4%
+Auto-Discard Precision:     63.0%
 Auto-Discard Recall:        100.0%
 ```
 
@@ -296,15 +297,21 @@ Auto-Discard Recall:        100.0%
 | --- | --- | --- |
 | Numeric Hallucination Rate | **19.9% → 0.0%** | Zero bad numbers survive the gate. |
 | Auto-Discard Recall | **100.0%** | All 29 labeled bad fields were discarded (FN = 0). |
-| Auto-Discard Precision | **35.8%** | 52 good fields were discarded alongside them. |
-| Grounded-Accuracy | **64.4%** | Share of all 146 fields that end up correctly verified. |
+| Auto-Discard Precision | **63.0%** | 17 good fields were discarded alongside them. |
+| Grounded-Accuracy | **88.4%** | Share of all 146 fields that end up correctly verified. |
 
 **We publish the unflattering numbers on purpose.** The objective function here is *not*
 accuracy — it is **zero leakage**: no fabricated number may reach a downstream ledger,
-and the price we knowingly pay is precision. When a rule breaks, the gate cannot yet tell
-*which* of the fields the rule references is the liar, so it discards all of them.
-Precision 35.8% is the cost of Recall 100%. Narrowing that (fault localization) is the
-headline item of v0.2, and it is a pure precision improvement — it cannot cost recall.
+and the price we knowingly pay is precision.
+
+**Fault localization** buys most of that price back. A broken rule names several fields but
+indicts only some of them, so the gate sets aside any field a *passing* rule corroborates,
+then blames the smallest sets of the rest that account for every violation. Because a
+single wrong value must appear in every rule that broke, `{that value}` is always among
+those minimum explanations — so blaming their union cannot lose it. Recall stays at 100%
+while precision went 35.8% → **63.0%** and grounded-accuracy 64.4% → **88.4%** (false
+discards 52 → 17). What remains is genuine ambiguity: when two fields explain the failures
+equally well, both go.
 
 ### What NumHall-KR is, and what it is not
 
@@ -377,9 +384,12 @@ Read these before trusting the gate in production:
 - **Single-voucher assumption.** Each document is treated as one self-contained voucher
   with one set of fields. Multi-invoice pages, consolidated statements, and cross-document
   aggregates are out of scope.
-- **Sibling over-discard.** A violated rule taints every field it references, not just the
-  wrong one (Precision 35.8%). Expect verified-only pipelines to send more work to human
-  review than strictly necessary.
+- **Ambiguity still over-discards.** Fault localization narrows a violation to the smallest
+  sets of fields that explain it, but when two fields explain it equally well — 세액 vs
+  공급가액 with no line items to break the tie — both are discarded (Precision 63.0%).
+  More overlapping invariants in a rule pack means sharper localization; a pack with a
+  single rule, like `statement`, cannot localize at all. Expect verified-only pipelines to
+  send some correct values to human review.
 - **Table-cell bbox mapping is coarse.** Bounding boxes come from the PDF adapter at
   line/region granularity; individual cells inside a table are not precisely mapped, so
   viewer overlays on dense tables can be approximate.
@@ -411,8 +421,9 @@ Read these before trusting the gate in production:
 
 **v0.2**
 
-- **Fault localization** — identify *which* operand of a violated rule is wrong instead of
-  discarding the whole group. Precision-only improvement; recall stays at 100%.
+- ~~**Fault localization**~~ — shipped. Precision 35.8% → 63.0%, grounded-accuracy
+  64.4% → 88.4%, recall unchanged at 100%. What is left is genuine ambiguity, which
+  needs *more invariants* per document rather than a smarter search.
 - **Real-document golden set** — labeled real (de-identified) documents alongside the
   synthetic suite, reported separately so the two are never conflated.
 - **Unit scaling** — detect 천원/백만원 headers and normalize before rule evaluation.

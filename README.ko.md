@@ -54,18 +54,19 @@ XX vat    value=250,000원     verdict=discarded conf=0.0
        ! grounding: cited quote not found verbatim in document: '세액  250,000원'
        ! vat_equals_supply_x_10pct: 250,000 vs 100,000 (tol 1) -> diff 150,000
        ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
-XX total  value=1,100,000원   verdict=discarded conf=0.0
-       ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
-summary: {"total": 3, "verified": 0, "discarded": 3, "ungrounded": 1, "rule_pack": "tax_invoice", "rules_applied": 2}
+OK total  value=1,100,000원   verdict=verified conf=1.0
+summary: {"total": 3, "verified": 1, "discarded": 2, "ungrounded": 1, "rule_pack": "tax_invoice", "rules_applied": 2}
 ```
 
 요약의 `rule_pack`·`rules_applied`는 **어떤 불변식이 실제로 돌았는지**를 기록합니다.
 `rules_applied: 0`이면 산술 검증이 하나도 수행되지 않았다는 뜻이며, "전부 통과"와는 전혀
 다른 상황입니다.
 
-환각된 `vat`뿐 아니라 세 필드가 모두 폐기됩니다. 위반된 산술 규칙이 `supply`·`total`을
-참조하므로 게이트가 **형제 필드까지 보수적으로 함께 폐기**하기 때문입니다. 이 트레이드오프는
-[지표](#numhall-kr-벤치마크)와 [한계](#한계)에서 그대로 공개합니다.
+`supply`도 함께 폐기되지만 `total`은 살아남는 점을 보십시오. 두 불변식이 모두 깨졌고
+`vat`와 `supply`는 **둘 다에 등장**하므로 산술만으로는 누가 거짓말쟁이인지 가릴 수 없어
+둘 다 폐기됩니다. `total`은 둘 중 하나에만 등장하므로 이 실패 전체를 설명할 수 없고,
+따라서 지목되지 않습니다. 이 좁히기가 [fault localization](#numhall-kr-벤치마크)이며,
+좁히지 못하는 경우는 [한계](#한계)에서 공개합니다.
 
 이 명령은 내장 데모만 실행합니다. 문서 파일 인자를 받지 않으며(넘기면 처리한 척하지 않고
 그렇다고 알려줍니다), `--json`은 동일한 결과를 기계가 읽을 수 있는 JSON으로 출력합니다.
@@ -248,10 +249,10 @@ python -m groundextract.bench
 ```text
 === NumHall-KR benchmark ===
 fields: 146  (ground-truth bad: 29)
-confusion: TP=29 FP=52 FN=0 TN=65
+confusion: TP=29 FP=17 FN=0 TN=100
 Numeric Hallucination Rate: 19.9% (before gate)  ->  0.0% (after gate)
-Grounded-Accuracy:          64.4%
-Auto-Discard Precision:     35.8%
+Grounded-Accuracy:          88.4%
+Auto-Discard Precision:     63.0%
 Auto-Discard Recall:        100.0%
 ```
 
@@ -259,15 +260,21 @@ Auto-Discard Recall:        100.0%
 | --- | --- | --- |
 | Numeric Hallucination Rate | **19.9% → 0.0%** | 게이트를 통과한 환각 숫자 0건 |
 | Auto-Discard Recall | **100.0%** | 라벨된 환각 29건 전부 폐기(FN=0) |
-| Auto-Discard Precision | **35.8%** | 정상 필드 52건이 함께 폐기됨 |
-| Grounded-Accuracy | **64.4%** | 전체 146필드 중 최종적으로 올바르게 verified 된 비율 |
+| Auto-Discard Precision | **63.0%** | 정상 필드 17건이 함께 폐기됨 |
+| Grounded-Accuracy | **88.4%** | 전체 146필드 중 최종적으로 올바르게 verified 된 비율 |
 
 **불리한 수치를 의도적으로 함께 공개합니다.** 이 시스템의 목적함수는 정확도가 아니라
 **누출 0**입니다. 지어낸 숫자가 downstream 장부에 단 하나도 도달하지 않는 것이 목표이고,
-그 대가로 정밀도를 내주는 것을 알고서 선택했습니다. 규칙이 깨졌을 때 참조된 필드 중
-**누가 거짓말쟁이인지** 아직 특정하지 못하므로 전부 폐기하기 때문입니다.
-정밀도 35.8%는 재현율 100%의 비용이며, 이를 좁히는 fault localization이 v0.2의 첫 항목입니다
-(재현율을 깎지 않는 **순수 정밀도 개선**).
+그 대가로 정밀도를 내주는 것을 알고서 선택했습니다.
+
+**fault localization**이 그 대가의 대부분을 되찾습니다. 깨진 규칙은 여러 필드를 지목하지만
+실제로 유죄인 것은 일부입니다. 그래서 게이트는 먼저 *통과한* 규칙이 입증해 주는 필드를
+용의선상에서 제외하고, 남은 후보 중 **모든 위반을 설명하는 가장 작은 조합들**을 지목합니다.
+값 하나가 틀렸다면 그 값은 깨진 모든 규칙에 반드시 등장하므로 `{그 값}` 자체가 언제나
+최소 설명에 포함됩니다 — 최소 설명들의 합집합을 지목하는 한 진범을 놓칠 수 없습니다.
+재현율 100%를 유지한 채 정밀도 35.8% → **63.0%**, 근거정확도 64.4% → **88.4%**
+(오폐기 52 → 17). 남은 것은 진짜 모호성입니다. 두 필드가 실패를 똑같이 잘 설명하면
+둘 다 폐기됩니다.
 
 ### NumHall-KR이 무엇이고, 무엇이 아닌가
 
@@ -335,8 +342,11 @@ python -m http.server 8931 --directory viewer   # → http://localhost:8931/inde
 
 - **단일 전표 가정** — 문서 하나 = 필드 집합 하나로 취급합니다. 한 페이지 다중 전표,
   연결재무제표, 문서 간 집계는 범위 밖입니다.
-- **형제 필드 과폐기** — 위반된 규칙은 참조하는 모든 필드를 오염시킵니다(정밀도 35.8%).
-  verified만 자동 처리하는 파이프라인은 필요 이상으로 많은 건을 사람에게 넘깁니다.
+- **모호할 때는 여전히 과폐기** — fault localization이 위반을 설명하는 최소 조합까지
+  좁히지만, 두 필드가 똑같이 잘 설명하면(품목 행이 없어 세액과 공급가액을 가릴 수 없는
+  경우) 둘 다 폐기됩니다(정밀도 63.0%). 룰팩에 서로 겹치는 불변식이 많을수록 좁히기가
+  날카로워지며, `statement`처럼 규칙이 하나뿐인 팩은 아예 좁힐 수 없습니다. verified만
+  자동 처리하는 파이프라인은 일부 정상 값을 사람에게 넘기게 됩니다.
 - **표 셀 bbox가 거칠다** — bbox는 PDF 어댑터의 줄/영역 단위로 나오며, 표 내부 개별 셀은
   정밀 매핑되지 않습니다. 조밀한 표에서 뷰어 오버레이가 근사치일 수 있습니다.
 - **규칙은 산술이지 의미가 아니다** — 숫자의 존재와 정합성만 검증하며, 거래처·일자·계정과목
@@ -364,8 +374,9 @@ python -m http.server 8931 --directory viewer   # → http://localhost:8931/inde
 
 **v0.2**
 
-- **Fault localization** — 위반된 규칙의 피연산자 중 **누가 틀렸는지** 특정해 전부 폐기하지
-  않기. 재현율을 깎지 않는 순수 정밀도 개선.
+- ~~**Fault localization**~~ — 반영 완료. 정밀도 35.8% → 63.0%, 근거정확도 64.4% → 88.4%,
+  재현율은 100% 그대로. 남은 것은 진짜 모호성이며, 더 똑똑한 탐색이 아니라 문서당
+  **불변식을 더 갖추는 것**이 답입니다.
 - **실문서 골든셋** — 비식별화된 실제 문서 라벨셋을 합성 스위트와 **분리 보고**.
 - **단위 스케일링** — 천원/백만원 헤더 감지 후 규칙 평가 전 정규화.
 - **표 셀 bbox** — 표 필드의 셀 단위 매핑.

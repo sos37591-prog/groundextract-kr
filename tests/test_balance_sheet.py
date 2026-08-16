@@ -48,14 +48,24 @@ def test_single_misread_caught_by_arithmetic_only():
     fields = _by_field({"noncurrent_assets": 39_431_895}, text)
 
     assert fields["noncurrent_assets"].grounded is True  # OCR is self-consistent
-    # asset side breaks 자산총계 = 유동 + 비유동 -> all three discarded
-    for f in ("noncurrent_assets", "current_assets", "total_assets"):
+    # 자산총계 = 유동 + 비유동 breaks. Arithmetic alone cannot say which of the two
+    # addends is the liar, so both are discarded.
+    for f in ("noncurrent_assets", "current_assets"):
         assert fields[f].verdict is Verdict.DISCARDED, f
         assert fields[f].confidence == 0.0
     # the arithmetic check (not grounding) is what fired on the misread field
     assert any(
         c.name == "assets_eq_current_plus_noncurrent" and not c.passed
         for c in fields["noncurrent_assets"].checks
+    )
+    # 자산총계 itself survives: it is the *sum*, and 대차평형 (자산총계 =
+    # 부채와자본총계) independently corroborates it, so the broken sum rule cannot
+    # be its fault. Discarding it too was the over-discard this pack's overlapping
+    # invariants are there to avoid.
+    assert fields["total_assets"].verdict is Verdict.VERIFIED
+    assert any(
+        c.name == "fault_localization" and "not implicated" in c.detail
+        for c in fields["total_assets"].checks
     )
     # 부채·자본 side is untouched
     for f in ("total_liabilities", "total_equity", "total_liab_equity"):

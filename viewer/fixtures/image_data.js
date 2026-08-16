@@ -62,8 +62,8 @@ window.GEK_DOCS = [
     "injected": {
       "summary": {
         "total": 3,
-        "verified": 0,
-        "discarded": 3,
+        "verified": 1,
+        "discarded": 2,
         "ungrounded": 1,
         "rule_pack": "tax_invoice",
         "rules_applied": 2
@@ -123,24 +123,19 @@ window.GEK_DOCS = [
           "field": "total",
           "label": "합계금액",
           "value": "165,000원",
-          "verdict": "discarded",
-          "confidence": 0.0,
+          "verdict": "verified",
+          "confidence": 1.0,
           "box": [
             290,
             1057,
             381,
             1098
           ],
-          "failed": [
-            {
-              "name": "total_equals_supply_plus_vat",
-              "detail": "165,000 vs 200,000 (tol 1) -> diff 35,000"
-            }
-          ]
+          "failed": []
         }
       ]
     },
-    "story": "환각 세액(50,000원)은 문서에 없음 → 근거 실패 + 산술 위반으로 연쇄 폐기",
+    "story": "환각 세액(50,000원)은 문서에 없음 → 근거 실패 + 산술 위반. 합계금액은 두 위반을 설명하지 못하므로 폐기되지 않음",
     "source": "비식별 캡처 (공급자·공급받는자·승인번호 마스킹 · 품목 일반화)"
   },
   {
@@ -248,8 +243,8 @@ window.GEK_DOCS = [
     "injected": {
       "summary": {
         "total": 6,
-        "verified": 3,
-        "discarded": 3,
+        "verified": 4,
+        "discarded": 2,
         "ungrounded": 0,
         "rule_pack": "balance_sheet",
         "rules_applied": 3
@@ -297,20 +292,15 @@ window.GEK_DOCS = [
           "field": "total_assets",
           "label": "자산총계",
           "value": "437,611,995원",
-          "verdict": "discarded",
-          "confidence": 0.0,
+          "verdict": "verified",
+          "confidence": 1.0,
           "box": [
             484.0,
             1061.9,
             581.9,
             1077.6
           ],
-          "failed": [
-            {
-              "name": "assets_eq_current_plus_noncurrent",
-              "detail": "total_assets=437,611,995 vs sum(current_assets+noncurrent_assets)=437,611,895 -> diff 100"
-            }
-          ]
+          "failed": []
         },
         {
           "field": "total_liabilities",
@@ -356,7 +346,7 @@ window.GEK_DOCS = [
         }
       ]
     },
-    "story": "비유동자산 한 자리 오독은 OCR 텍스트에도 존재 → 근거 통과, 산술만 적발",
+    "story": "비유동자산 한 자리 오독은 OCR 텍스트에도 존재 → 근거 통과, 산술만 적발. 대차평형이 자산총계를 입증하므로 덧셈 항 2개만 폐기",
     "source": "합성 샘플 (표준 서식 · 모든 금액 가상 · 회계 항등식 성립)"
   }
 ];

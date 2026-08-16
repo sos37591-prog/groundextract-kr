@@ -284,18 +284,21 @@ def test_verify_extraction_discards_hallucinated_vat(responses: dict[int, dict])
     assert vat["confidence"] == 0.0
     assert any(c["name"] == "grounding" and not c["passed"] for c in vat["checks"])
 
-    # The violated invariants taint the sibling fields they reference (the
-    # documented over-discard design), so the whole doc is discarded here.
+    # Both invariants break. `vat` and `supply` each appear in both, so arithmetic
+    # cannot say which one is the liar and both are discarded; `total` appears in
+    # only one, so it cannot be the single explanation and survives.
     # The summary also states which pack ran and how many rules it applied, so
     # the caller can tell verification apart from "nothing was checked".
     assert payload["summary"] == {
         "total": 3,
-        "verified": 0,
-        "discarded": 3,
+        "verified": 1,
+        "discarded": 2,
         "ungrounded": 1,
         "rule_pack": "tax_invoice",
         "rules_applied": 2,
     }
+    assert by_field["supply"]["verdict"] == "discarded"
+    assert by_field["total"]["verdict"] == "verified"
 
 
 def test_extract_verified_reports_error_without_ollama(responses: dict[int, dict]) -> None:
@@ -340,7 +343,8 @@ def test_values_without_number_are_still_verified_arithmetically(
     responses: dict[int, dict],
 ) -> None:
     payload = _payload(responses[9])
-    assert payload["summary"]["verified"] == 0
+    # the swapped `vat` and its indistinguishable sibling `supply` are discarded
+    assert payload["summary"]["discarded"] == 2
     assert payload["summary"]["rules_applied"] == 2  # the arithmetic really ran
     vat = next(f for f in payload["fields"] if f["field"] == "vat")
     assert vat["value"]["number"] is None  # client omitted the optional field
@@ -362,9 +366,14 @@ def test_doc_type_path_traversal_is_rejected(responses: dict[int, dict]) -> None
 
 def test_field_swap_is_discarded_with_the_right_pack(responses: dict[int, dict]) -> None:
     payload = _payload(responses[12])
-    assert payload["summary"]["verified"] == 0
+    assert payload["summary"]["discarded"] == 2
     assert payload["summary"]["rules_applied"] == 2
-    assert all(f["verdict"] == "discarded" for f in payload["fields"])
+    by_field = {f["field"]: f for f in payload["fields"]}
+    # the swap makes `vat` and `supply` equally plausible culprits; `total` is
+    # referenced by only one of the two broken rules, so it is not implicated
+    assert by_field["vat"]["verdict"] == "discarded"
+    assert by_field["supply"]["verdict"] == "discarded"
+    assert by_field["total"]["verdict"] == "verified"
 
 
 # --- the loop survives malformed input -----------------------------------------

@@ -55,9 +55,8 @@ def test_clean_fixture_fully_verified(tmp_path):
     assert all(f["confidence"] > 0 for f in clean["fields"])
 
 
-def test_injected_fixture_discards_vat_and_taints_siblings(tmp_path):
+def test_injected_fixture_discards_only_the_vat(tmp_path):
     _, injected, _ = _export(tmp_path)
-    assert injected["summary"]["discarded"] >= 1
     by_field = {f["field"]: f for f in injected["fields"]}
 
     vat = by_field["vat"]
@@ -67,12 +66,18 @@ def test_injected_fixture_discards_vat_and_taints_siblings(tmp_path):
     assert "grounding" in failed  # 250,000 has no verbatim support
     assert any(name != "grounding" for name in failed)  # arithmetic also broke
 
-    # sibling contamination: the violated invariants taint supply/total too
-    assert by_field["supply"]["verdict"] == "discarded"
-    assert by_field["total"]["verdict"] == "discarded"
-    # ...but fields the broken rules never reference stay verified
-    assert by_field["item1_supply"]["verdict"] == "verified"
-    assert by_field["item2_supply"]["verdict"] == "verified"
+    # This fixture carries line items, so 공급가액 = ∑품목 holds independently of
+    # the broken rules and vouches for `supply`. That leaves `vat` as the only
+    # explanation for both violations, and nothing else is discarded — the whole
+    # point of localizing the fault instead of blaming every field a broken rule
+    # happens to mention.
+    assert injected["summary"]["discarded"] == 1
+    for other in ("supply", "total", "item1_supply", "item2_supply"):
+        assert by_field[other]["verdict"] == "verified", other
+    assert any(
+        c["name"] == "fault_localization" and "vat" in c["detail"]
+        for c in by_field["total"]["checks"]
+    )
 
 
 def test_injected_vat_quote_is_findable_for_the_viewer(tmp_path):
