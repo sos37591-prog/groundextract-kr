@@ -11,7 +11,23 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
-_Nothing yet. See the roadmap in [README.md](README.md#roadmap)._
+### Changed
+
+- **The viewer fixture builder uses `pypdfium2` (BSD-3-Clause / Apache-2.0)
+  instead of PyMuPDF (AGPL-3.0).** PyMuPDF sat in the optional, maintainer-only
+  `fixture` extra, so it never shipped to a user — but an AGPL package anywhere
+  in the declared dependency graph is a licence-compatibility question an
+  Apache-2.0 project should not have to answer, and automated licence scans do
+  not care that the extra is optional. pdfium provides the same two things the
+  script needs (a rasterized page and word boxes), so nothing was traded away.
+  The whole dependency surface, runtime and extras alike, is now MIT / BSD-3 /
+  Apache-2.0.
+- CI's licence gate now scans the `fixture` extra as well as the runtime
+  dependency, because the optional surface is where the question actually lived.
+- `viewer/assets/balance_sheet_demo.png` and `viewer/fixtures/image_data.js`
+  were regenerated with the new renderer. Gate results are identical; box
+  coordinates shift by up to ~2px from glyph-metric differences between the two
+  engines.
 
 ## [0.1.1] - 2026-08-16
 

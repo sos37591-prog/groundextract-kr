@@ -63,7 +63,7 @@ docling = ["docling>=2.0"]
 # Regenerating the viewer fixture (viewer/build_combined_fixture.py):
 # PDF rendering + image masking. Not needed to run the viewer, which ships
 # with the generated fixture committed.
-fixture = ["pymupdf", "pillow"]
+fixture = ["pypdfium2", "pillow"]
 # NOTE: there is no "llm" extra on purpose. The Ollama backend
 # (groundextract.llm.OllamaExtractor) and the MCP server are standard library
 # only; they need a running Ollama server, not a Python package.

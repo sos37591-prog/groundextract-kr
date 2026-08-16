@@ -18,7 +18,14 @@ issuer imagery, barcodes and company identifiers were removed at object level.
 That is why this script needs no private input and anyone can reproduce the
 fixture. ``GEK_BALANCE_PDF`` may still point it at a different source document.
 
-Run (needs PyMuPDF + Pillow):  python viewer/build_combined_fixture.py
+Run (needs pypdfium2 + Pillow):  python viewer/build_combined_fixture.py
+
+PDF rendering and text extraction go through **pypdfium2** (BSD-3-Clause /
+Apache-2.0), not PyMuPDF. PyMuPDF is AGPL-3.0, and an AGPL package anywhere in
+the dependency graph — even in an optional, maintainer-only extra like this one —
+is a licence-compatibility question this Apache-2.0 project should not have to
+answer. pdfium gives the same two things this script needs (a rasterized page and
+word boxes), so there is nothing to trade away.
 """
 
 from __future__ import annotations
@@ -28,7 +35,7 @@ import os
 import sys
 from pathlib import Path
 
-import fitz
+import pypdfium2 as pdfium
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -150,6 +157,43 @@ def _digits(s: str) -> str:
     return "".join(c for c in s if c.isdigit())
 
 
+def _words(page, textpage) -> list[tuple[float, float, float, float, str]]:
+    """Whitespace-delimited words as ``(x0, y0, x1, y1, text)`` in page points.
+
+    pdfium exposes characters, not words, and puts the origin at the bottom-left
+    with y growing upward. Both are converted here so the rest of the script (and
+    the boxes it writes into the fixture) keeps working in the top-left,
+    y-down space the viewer overlays expect.
+    """
+    _, page_height = page.get_size()
+    out: list[tuple[float, float, float, float, str]] = []
+    chars: list[str] = []
+    box: list[float] | None = None
+
+    def flush() -> None:
+        nonlocal box
+        if chars and box is not None:
+            out.append((box[0], box[1], box[2], box[3], "".join(chars)))
+        chars.clear()
+        box = None
+
+    for i in range(textpage.count_chars()):
+        ch = textpage.get_text_range(i, 1)
+        if not ch or ch.isspace():
+            flush()
+            continue
+        left, bottom, right, top = textpage.get_charbox(i)
+        # bottom-left origin -> top-left origin
+        y0, y1 = page_height - top, page_height - bottom
+        if box is None:
+            box = [left, y0, right, y1]
+        else:
+            box = [min(box[0], left), min(box[1], y0), max(box[2], right), max(box[3], y1)]
+        chars.append(ch)
+    flush()
+    return out
+
+
 def build_balance() -> dict:
     if not SRC_PDF.exists():
         raise SystemExit(
@@ -165,15 +209,15 @@ def build_balance() -> dict:
             f"! derived from it.",
             file=sys.stderr,
         )
-    doc = fitz.open(SRC_PDF)
+    doc = pdfium.PdfDocument(SRC_PDF)
     page = doc[BS_PAGE]
-    pix = page.get_pixmap(matrix=fitz.Matrix(Z, Z))
-    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    img = page.render(scale=Z).to_pil().convert("RGB")
     W, H = img.size
     BS_IMG.parent.mkdir(parents=True, exist_ok=True)
     img.save(BS_IMG)
 
-    words = page.get_text("words")
+    textpage = page.get_textpage()
+    words = _words(page, textpage)
 
     def box_for(num: int, side: str | None):
         key = str(num)
@@ -190,7 +234,7 @@ def build_balance() -> dict:
 
     boxes = {fid: box_for(num, side) for fid, _lbl, num, side in BS_FIELDS}
     labels = {fid: lbl for fid, lbl, _n, _s in BS_FIELDS}
-    real_text = page.get_text()
+    real_text = textpage.get_text_range()
     pack = load_rule_pack(ROOT / "rules" / "balance_sheet.yaml")
 
     def run(noncur_num: int, noncur_raw: str, text: str) -> dict:

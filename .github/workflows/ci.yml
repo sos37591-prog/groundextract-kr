@@ -48,7 +48,11 @@ jobs:
       - name: Install package + SBOM tooling
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
+          # Install the extras a user can actually pull in, not just the runtime
+          # dep — the licence question lives in the optional surface. `docling`
+          # is left out deliberately: it drags in a multi-GB ML stack that would
+          # dominate this job, and it is scanned separately when it changes.
+          python -m pip install -e ".[fixture]"
           python -m pip install pip-licenses cyclonedx-bom
 
       - name: License allowlist (deny GPL/AGPL copyleft)

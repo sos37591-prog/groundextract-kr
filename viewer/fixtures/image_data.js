@@ -166,10 +166,10 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            483.5,
-            420.2,
-            582.5,
-            438.2
+            484.2,
+            422.4,
+            581.9,
+            438.1
           ],
           "failed": []
         },
@@ -180,10 +180,10 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            492.6,
-            819.9,
-            582.6,
-            837.9
+            493.2,
+            822.1,
+            581.9,
+            837.8
           ],
           "failed": []
         },
@@ -194,10 +194,10 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            483.5,
-            1059.7,
-            582.5,
-            1077.7
+            484.0,
+            1061.9,
+            581.9,
+            1077.6
           ],
           "failed": []
         },
@@ -208,10 +208,10 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            988.1,
-            420.2,
-            1087.1,
-            438.2
+            989.9,
+            422.4,
+            1086.4,
+            438.1
           ],
           "failed": []
         },
@@ -222,10 +222,10 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            988.1,
-            633.4,
-            1087.1,
-            651.4
+            988.7,
+            635.5,
+            1086.5,
+            651.3
           ],
           "failed": []
         },
@@ -236,9 +236,9 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            988.1,
-            660.0,
-            1087.1,
+            988.6,
+            662.2,
+            1086.5,
             678.0
           ],
           "failed": []
@@ -262,10 +262,10 @@ window.GEK_DOCS = [
           "verdict": "discarded",
           "confidence": 0.0,
           "box": [
-            483.5,
-            420.2,
-            582.5,
-            438.2
+            484.2,
+            422.4,
+            581.9,
+            438.1
           ],
           "failed": [
             {
@@ -281,10 +281,10 @@ window.GEK_DOCS = [
           "verdict": "discarded",
           "confidence": 0.0,
           "box": [
-            492.6,
-            819.9,
-            582.6,
-            837.9
+            493.2,
+            822.1,
+            581.9,
+            837.8
           ],
           "failed": [
             {
@@ -300,10 +300,10 @@ window.GEK_DOCS = [
           "verdict": "discarded",
           "confidence": 0.0,
           "box": [
-            483.5,
-            1059.7,
-            582.5,
-            1077.7
+            484.0,
+            1061.9,
+            581.9,
+            1077.6
           ],
           "failed": [
             {
@@ -319,10 +319,10 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            988.1,
-            420.2,
-            1087.1,
-            438.2
+            989.9,
+            422.4,
+            1086.4,
+            438.1
           ],
           "failed": []
         },
@@ -333,10 +333,10 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            988.1,
-            633.4,
-            1087.1,
-            651.4
+            988.7,
+            635.5,
+            1086.5,
+            651.3
           ],
           "failed": []
         },
@@ -347,9 +347,9 @@ window.GEK_DOCS = [
           "verdict": "verified",
           "confidence": 1.0,
           "box": [
-            988.1,
-            660.0,
-            1087.1,
+            988.6,
+            662.2,
+            1086.5,
             678.0
           ],
           "failed": []
