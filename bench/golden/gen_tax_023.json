@@ -1,28 +1,31 @@
 {
   "doc_id": "gen_tax_023",
   "doc_type": "tax_invoice",
-  "full_text": "전자세금계산서\n승인번호: 20261215-85283645-11297845\n작성일자: 2026-12-15\n공급자: 대현전자 주식회사 (등록번호 214-19-29536)\n공급받는자: 한결시스템 주식회사 (등록번호 658-14-58393)\n\n품목: 키오스크 설치\n\n공급가액  10,689,000원\n세액  1,068,900원\n합계금액  11,757,900원\n",
-  "injected_error": null,
+  "full_text": "전자세금계산서\n승인번호: 20260626-45810056-31367172\n작성일자: 2026-06-26\n공급자: 한결시스템 주식회사 (등록번호 906-99-24168)\n공급받는자: (주)가온소프트 (등록번호 491-14-71694)\n\n품목: 전산장비 납품\n\n공급가액  48,371,000원\n세액  4,837,100원\n합계금액  53,208,100원\n",
+  "injected_error": {
+    "kind": "field-swap",
+    "field": "supply"
+  },
   "fields": [
     {
       "field": "supply",
-      "raw": "10,689,000원",
-      "number": 10689000,
-      "grounding_quote": "공급가액  10,689,000원",
-      "expected_verdict": "verified"
+      "raw": "53,208,100원",
+      "number": 53208100,
+      "grounding_quote": "합계금액  53,208,100원",
+      "expected_verdict": "discarded"
     },
     {
       "field": "vat",
-      "raw": "1,068,900원",
-      "number": 1068900,
-      "grounding_quote": "세액  1,068,900원",
+      "raw": "4,837,100원",
+      "number": 4837100,
+      "grounding_quote": "세액  4,837,100원",
       "expected_verdict": "verified"
     },
     {
       "field": "total",
-      "raw": "11,757,900원",
-      "number": 11757900,
-      "grounding_quote": "합계금액  11,757,900원",
+      "raw": "53,208,100원",
+      "number": 53208100,
+      "grounding_quote": "합계금액  53,208,100원",
       "expected_verdict": "verified"
     }
   ]

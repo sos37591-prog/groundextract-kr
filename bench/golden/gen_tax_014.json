@@ -1,31 +1,31 @@
 {
   "doc_id": "gen_tax_014",
   "doc_type": "tax_invoice",
-  "full_text": "전자세금계산서\n승인번호: 20260407-28814949-66623995\n작성일자: 2026-04-07\n공급자: 대현전자 주식회사 (등록번호 287-45-70637)\n공급받는자: (주)누리상사 (등록번호 355-19-68082)\n\n품목: 홈페이지 제작\n\n공급가액  16,395,000원\n세액  1,639,500원\n합계금액  18,034,500원\n",
+  "full_text": "전자세금계산서\n승인번호: 20260922-35487660-49823450\n작성일자: 2026-09-22\n공급자: (주)누리상사 (등록번호 322-17-85914)\n공급받는자: 동성물산 주식회사 (등록번호 853-79-17989)\n\n품목: 데이터베이스 구축\n\n공급가액  47,974,000원\n세액  4,797,400원\n합계금액  52,771,400원\n",
   "injected_error": {
-    "kind": "ungrounded",
+    "kind": "field-swap",
     "field": "supply"
   },
   "fields": [
     {
       "field": "supply",
-      "raw": "70,955,000원",
-      "number": 70955000,
-      "grounding_quote": "공급가액  70,955,000원",
+      "raw": "4,797,400원",
+      "number": 4797400,
+      "grounding_quote": "세액  4,797,400원",
       "expected_verdict": "discarded"
     },
     {
       "field": "vat",
-      "raw": "1,639,500원",
-      "number": 1639500,
-      "grounding_quote": "세액  1,639,500원",
+      "raw": "4,797,400원",
+      "number": 4797400,
+      "grounding_quote": "세액  4,797,400원",
       "expected_verdict": "verified"
     },
     {
       "field": "total",
-      "raw": "18,034,500원",
-      "number": 18034500,
-      "grounding_quote": "합계금액  18,034,500원",
+      "raw": "52,771,400원",
+      "number": 52771400,
+      "grounding_quote": "합계금액  52,771,400원",
       "expected_verdict": "verified"
     }
   ]

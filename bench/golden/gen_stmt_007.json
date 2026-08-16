@@ -1,24 +1,24 @@
 {
   "doc_id": "gen_stmt_007",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n한결시스템 주식회사  2026년 07월 25일 현재\n(단위: 원)\n\n계정과목  차변  대변\n비품  차변 2,105,000원\n미수금  차변 18,423,000원\n매출  대변 10,843,000원\n외상매입금  대변 2,514,000원\n미지급금  대변 7,171,000원\n\n차변 합계  20,528,000원\n대변 합계  20,528,000원\n",
+  "full_text": "합계잔액시산표\n(주)미래유통  2026년 11월 14일 현재\n(단위: 원)\n\n계정과목  차변  대변\n미수금  차변 40,781,000원\n비품  차변 20,980,000원\n단기차입금  대변 59,437,000원\n외상매입금  대변 2,324,000원\n\n차변 합계  61,761,000원\n대변 합계  61,761,000원\n",
   "injected_error": {
-    "kind": "ungrounded",
+    "kind": "field-swap",
     "field": "debit_total"
   },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "77,367,850원",
-      "number": 77367850,
-      "grounding_quote": "차변 합계  77,367,850원",
+      "raw": "2,324,000원",
+      "number": 2324000,
+      "grounding_quote": "외상매입금  대변 2,324,000원",
       "expected_verdict": "discarded"
     },
     {
       "field": "credit_total",
-      "raw": "20,528,000원",
-      "number": 20528000,
-      "grounding_quote": "대변 합계  20,528,000원",
+      "raw": "61,761,000원",
+      "number": 61761000,
+      "grounding_quote": "대변 합계  61,761,000원",
       "expected_verdict": "verified"
     }
   ]

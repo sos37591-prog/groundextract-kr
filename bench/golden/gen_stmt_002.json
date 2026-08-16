@@ -1,22 +1,25 @@
 {
   "doc_id": "gen_stmt_002",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n주식회사 한빛상사  2026년 01월 08일 현재\n(단위: 원)\n\n계정과목  차변  대변\n소모품비  차변 9,300,000원\n외상매출금  차변 13,441,000원\n미지급금  대변 3,061,000원\n선수금  대변 4,636,000원\n단기차입금  대변 15,044,000원\n\n차변 합계  22,741,000원\n대변 합계  22,741,000원\n",
-  "injected_error": null,
+  "full_text": "합계잔액시산표\n(주)세정기업  2026년 08월 20일 현재\n(단위: 원)\n\n계정과목  차변  대변\n보통예금  차변 6,583,000원\n미수금  차변 26,080,000원\n비품  차변 35,726,000원\n단기차입금  대변 59,830,000원\n선수금  대변 8,559,000원\n\n차변 합계  68,389,000원\n대변 합계  68,389,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "credit_total"
+  },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "22,741,000원",
-      "number": 22741000,
-      "grounding_quote": "차변 합계  22,741,000원",
+      "raw": "68,389,000원",
+      "number": 68389000,
+      "grounding_quote": "차변 합계  68,389,000원",
       "expected_verdict": "verified"
     },
     {
       "field": "credit_total",
-      "raw": "22,741,000원",
-      "number": 22741000,
-      "grounding_quote": "대변 합계  22,741,000원",
-      "expected_verdict": "verified"
+      "raw": "73,634,128원",
+      "number": 73634128,
+      "grounding_quote": "대변 합계  73,634,128원",
+      "expected_verdict": "discarded"
     }
   ]
 }

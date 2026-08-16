@@ -1,0 +1,50 @@
+{
+  "doc_id": "gen_bs_005",
+  "doc_type": "balance_sheet",
+  "full_text": "표준재무상태표\n(주)일송무역  제12기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  재고자산  562,000원\n  선급금  665,000원\n유동자산  1,227,000원\n  무형자산  1,134,000원\n  기계장치  557,000원\n비유동자산  1,691,000원\n자산총계  2,918,000원\n\n[부채와 자본]\n  미지급금  1,006,000원\n  매입채무  191,000원\n부채총계  1,197,000원\n  자본잉여금  26,000원\n  이익잉여금  1,695,000원\n자본총계  1,721,000원\n부채와자본총계  2,918,000원\n",
+  "injected_error": null,
+  "fields": [
+    {
+      "field": "current_assets",
+      "raw": "1,227,000원",
+      "number": 1227000,
+      "grounding_quote": "유동자산  1,227,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "noncurrent_assets",
+      "raw": "1,691,000원",
+      "number": 1691000,
+      "grounding_quote": "비유동자산  1,691,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_assets",
+      "raw": "2,918,000원",
+      "number": 2918000,
+      "grounding_quote": "자산총계  2,918,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liabilities",
+      "raw": "1,197,000원",
+      "number": 1197000,
+      "grounding_quote": "부채총계  1,197,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_equity",
+      "raw": "1,721,000원",
+      "number": 1721000,
+      "grounding_quote": "자본총계  1,721,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liab_equity",
+      "raw": "2,918,000원",
+      "number": 2918000,
+      "grounding_quote": "부채와자본총계  2,918,000원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

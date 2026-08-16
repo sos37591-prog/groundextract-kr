@@ -1,0 +1,53 @@
+{
+  "doc_id": "gen_bs_002",
+  "doc_type": "balance_sheet",
+  "full_text": "표준재무상태표\n(주)미래유통  제11기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  재고자산  14,271,000원\n  단기금융상품  16,158,000원\n유동자산  30,429,000원\n  무형자산  4,409,000원\n  보증금  637,000원\n  건물  925,000원\n비유동자산  5,971,000원\n자산총계  36,400,000원\n\n[부채와 자본]\n  매입채무  14,273,000원\n  예수금  12,785,000원\n  미지급금  4,629,000원\n부채총계  31,687,000원\n  자본금  2,012,000원\n  자본잉여금  629,000원\n  이익잉여금  2,072,000원\n자본총계  4,713,000원\n부채와자본총계  36,400,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "total_assets"
+  },
+  "fields": [
+    {
+      "field": "current_assets",
+      "raw": "30,429,000원",
+      "number": 30429000,
+      "grounding_quote": "유동자산  30,429,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "noncurrent_assets",
+      "raw": "5,971,000원",
+      "number": 5971000,
+      "grounding_quote": "비유동자산  5,971,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_assets",
+      "raw": "45,779,506원",
+      "number": 45779506,
+      "grounding_quote": "자산총계  45,779,506원",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "total_liabilities",
+      "raw": "31,687,000원",
+      "number": 31687000,
+      "grounding_quote": "부채총계  31,687,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_equity",
+      "raw": "4,713,000원",
+      "number": 4713000,
+      "grounding_quote": "자본총계  4,713,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liab_equity",
+      "raw": "36,400,000원",
+      "number": 36400000,
+      "grounding_quote": "부채와자본총계  36,400,000원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

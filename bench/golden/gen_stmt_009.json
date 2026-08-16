@@ -1,25 +1,25 @@
 {
   "doc_id": "gen_stmt_009",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n주식회사 한빛상사  2026년 02월 21일 현재\n(단위: 원)\n\n계정과목  차변  대변\n비품  차변 10,817,000원\n현금  차변 19,814,000원\n미수금  차변 13,926,000원\n단기차입금  대변 40,781,000원\n선수금  대변 3,776,000원\n\n차변 합계  44,557,000원\n대변 합계  44,557,000원\n",
+  "full_text": "합계잔액시산표\n(주)가온소프트  2026년 04월 27일 현재\n(단위: 원)\n\n계정과목  차변  대변\n지급수수료  차변 45,871,000원\n소모품비  차변 25,331,000원\n외상매입금  대변 8,994,000원\n선수금  대변 62,208,000원\n\n차변 합계  71,202,000원\n대변 합계  71,202,000원\n",
   "injected_error": {
-    "kind": "field-swap",
-    "field": "credit_total"
+    "kind": "ungrounded",
+    "field": "debit_total"
   },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "44,557,000원",
-      "number": 44557000,
-      "grounding_quote": "차변 합계  44,557,000원",
-      "expected_verdict": "verified"
+      "raw": "32,116,960원",
+      "number": 32116960,
+      "grounding_quote": "차변 합계  32,116,960원",
+      "expected_verdict": "discarded"
     },
     {
       "field": "credit_total",
-      "raw": "19,814,000원",
-      "number": 19814000,
-      "grounding_quote": "현금  차변 19,814,000원",
-      "expected_verdict": "discarded"
+      "raw": "71,202,000원",
+      "number": 71202000,
+      "grounding_quote": "대변 합계  71,202,000원",
+      "expected_verdict": "verified"
     }
   ]
 }

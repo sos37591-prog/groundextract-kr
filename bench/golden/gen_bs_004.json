@@ -1,0 +1,53 @@
+{
+  "doc_id": "gen_bs_004",
+  "doc_type": "balance_sheet",
+  "full_text": "표준재무상태표\n(주)가온소프트  제13기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  현금및현금성자산  13,943,000원\n  단기금융상품  10,500,000원\n  선급금  6,872,000원\n유동자산  31,315,000원\n  건물  11,529,000원\n  무형자산  3,340,000원\n  보증금  3,366,000원\n비유동자산  18,235,000원\n자산총계  49,550,000원\n\n[부채와 자본]\n  장기차입금  7,555,000원\n  단기차입금  683,000원\n  매입채무  9,517,000원\n부채총계  17,755,000원\n  자본금  23,636,000원\n  자본잉여금  8,159,000원\n자본총계  31,795,000원\n부채와자본총계  49,550,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "noncurrent_assets"
+  },
+  "fields": [
+    {
+      "field": "current_assets",
+      "raw": "31,315,000원",
+      "number": 31315000,
+      "grounding_quote": "유동자산  31,315,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "noncurrent_assets",
+      "raw": "39,718,000원",
+      "number": 39718000,
+      "grounding_quote": "비유동자산  39,718,000원",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "total_assets",
+      "raw": "49,550,000원",
+      "number": 49550000,
+      "grounding_quote": "자산총계  49,550,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liabilities",
+      "raw": "17,755,000원",
+      "number": 17755000,
+      "grounding_quote": "부채총계  17,755,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_equity",
+      "raw": "31,795,000원",
+      "number": 31795000,
+      "grounding_quote": "자본총계  31,795,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liab_equity",
+      "raw": "49,550,000원",
+      "number": 49550000,
+      "grounding_quote": "부채와자본총계  49,550,000원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

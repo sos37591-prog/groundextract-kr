@@ -1,31 +1,28 @@
 {
   "doc_id": "gen_tax_026",
   "doc_type": "tax_invoice",
-  "full_text": "전자세금계산서\n승인번호: 20260407-50962024-40547349\n작성일자: 2026-04-07\n공급자: (주)누리상사 (등록번호 328-13-96511)\n공급받는자: (주)세정기업 (등록번호 297-61-53025)\n\n품목: 경영 컨설팅 용역\n\n공급가액  30,947,000원\n세액  3,094,700원\n합계금액  34,041,700원\n",
-  "injected_error": {
-    "kind": "field-swap",
-    "field": "supply"
-  },
+  "full_text": "전자세금계산서\n승인번호: 20261007-68526649-10226999\n작성일자: 2026-10-07\n공급자: 청람테크 주식회사 (등록번호 632-78-97900)\n공급받는자: 주식회사 한빛상사 (등록번호 301-56-66531)\n\n품목: 시스템 유지보수\n\n공급가액  25,344,000원\n세액  2,534,400원\n합계금액  27,878,400원\n",
+  "injected_error": null,
   "fields": [
     {
       "field": "supply",
-      "raw": "34,041,700원",
-      "number": 34041700,
-      "grounding_quote": "합계금액  34,041,700원",
-      "expected_verdict": "discarded"
+      "raw": "25,344,000원",
+      "number": 25344000,
+      "grounding_quote": "공급가액  25,344,000원",
+      "expected_verdict": "verified"
     },
     {
       "field": "vat",
-      "raw": "3,094,700원",
-      "number": 3094700,
-      "grounding_quote": "세액  3,094,700원",
+      "raw": "2,534,400원",
+      "number": 2534400,
+      "grounding_quote": "세액  2,534,400원",
       "expected_verdict": "verified"
     },
     {
       "field": "total",
-      "raw": "34,041,700원",
-      "number": 34041700,
-      "grounding_quote": "합계금액  34,041,700원",
+      "raw": "27,878,400원",
+      "number": 27878400,
+      "grounding_quote": "합계금액  27,878,400원",
       "expected_verdict": "verified"
     }
   ]

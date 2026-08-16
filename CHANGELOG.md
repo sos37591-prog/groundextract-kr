@@ -42,6 +42,19 @@ Benchmark numbers are part of the public contract: any release that changes
   the tie — which needs more overlapping invariants per document, not a smarter
   search. A single-rule pack like `statement` cannot localize at all.
 
+- **`balance_sheet` is in NumHall-KR.** Its rule pack, viewer fixture and unit
+  tests already existed, but the benchmark ran only `tax_invoice` and
+  `statement` — a pack the benchmark never exercises is a pack whose regressions
+  nobody notices. The generator now builds 표준재무상태표 documents (three
+  overlapping invariants over six totals), two hand-written goldens were added,
+  and a test asserts the benchmark's document types stay in step with the packs
+  in `rules/`.
+
+  The suite grew from 46 documents / 146 fields to **58 / 218**, so the headline
+  numbers move with it — recall stays 100.0%, precision lands at 59.2% and
+  grounded-accuracy at 86.7% (both measured over a third more fields, and both
+  well above the 35.8% / 64.4% this release started from).
+
 ### Changed
 
 - **The viewer fixture builder uses `pypdfium2` (BSD-3-Clause / Apache-2.0)

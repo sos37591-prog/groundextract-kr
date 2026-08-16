@@ -2,8 +2,9 @@
 
 Writes ``gen_*.json`` golden documents into ``bench/golden/`` alongside the
 hand-written goldens (which are never overwritten): Korean tax invoices
-(전자세금계산서) and trial-balance statements (합계잔액시산표) with realistic
-layouts - 공급가액/세액/합계금액, 차변/대변 합계, varied thousands-comma amounts.
+(전자세금계산서), trial-balance statements (합계잔액시산표) and balance sheets
+(표준재무상태표) with realistic layouts - 공급가액/세액/합계금액, 차변/대변 합계,
+유동·비유동/부채·자본 총계, varied thousands-comma amounts.
 
 Roughly 20% of the labeled fields carry an injected extraction error
 (at most one per document, so labels stay unambiguous):
@@ -24,7 +25,8 @@ each labeled-bad field must come out DISCARDED (bench recall stays 1.0),
 clean docs must come out fully VERIFIED, swap fields must stay grounded, and
 failing candidates are deterministically re-rolled.
 
-Run:  python bench/generate_golden.py [--count-tax 30 --count-stmt 10 --seed 42]
+Run:  python bench/generate_golden.py
+        [--count-tax 30 --count-stmt 10 --count-balance 10 --seed 42]
 """
 
 from __future__ import annotations
@@ -62,6 +64,14 @@ _NUM_TOKEN = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
 _RULE_FIELDS = {
     "tax_invoice": ("supply", "vat", "total"),
     "statement": ("debit_total", "credit_total"),
+    "balance_sheet": (
+        "current_assets",
+        "noncurrent_assets",
+        "total_assets",
+        "total_liabilities",
+        "total_equity",
+        "total_liab_equity",
+    ),
 }
 
 _COMPANIES = [
@@ -76,6 +86,10 @@ _ITEMS = [
 ]
 _DEBIT_ACCOUNTS = ["현금", "보통예금", "외상매출금", "미수금", "비품", "소모품비", "지급수수료"]
 _CREDIT_ACCOUNTS = ["외상매입금", "미지급금", "자본금", "매출", "단기차입금", "선수금"]
+_CURRENT_ASSETS = ["현금및현금성자산", "단기금융상품", "매출채권", "재고자산", "선급금"]
+_NONCURRENT_ASSETS = ["토지", "건물", "기계장치", "무형자산", "보증금"]
+_LIABILITIES = ["매입채무", "미지급금", "단기차입금", "예수금", "장기차입금"]
+_EQUITY = ["자본금", "자본잉여금", "이익잉여금"]
 
 
 @dataclass
@@ -209,6 +223,85 @@ def _build_stmt(rng: random.Random) -> BuiltDoc:
     return BuiltDoc("statement", "\n".join(lines) + "\n", fields, swap_sources)
 
 
+def _build_balance(rng: random.Random) -> BuiltDoc:
+    """표준재무상태표 — three overlapping invariants over six totals.
+
+    The asset side and the liability/equity side each sum to the same figure, and
+    that figure is itself a field. Every total is therefore covered by two rules,
+    which is what lets the gate say *which* of them broke rather than discarding
+    the whole statement.
+    """
+    current_parts = _split_amount(rng, rng.randrange(300, 40_001), rng.randrange(2, 4))
+    noncurrent_parts = _split_amount(rng, rng.randrange(200, 30_001), rng.randrange(2, 4))
+    current = sum(current_parts)
+    noncurrent = sum(noncurrent_parts)
+    assets = current + noncurrent
+
+    # Split the same total across the funding side (부채 + 자본 = 자산).
+    liabilities = rng.randrange(1, assets // 1_000) * 1_000
+    equity = assets - liabilities
+    liab_parts = _split_amount(rng, liabilities // 1_000, rng.randrange(2, 4))
+    equity_parts = _split_amount(rng, equity // 1_000, rng.randrange(2, 4))
+
+    company = rng.choice(_COMPANIES)
+    term = rng.randrange(3, 30)
+
+    def rows(names: list[str], amounts: list[int]) -> list[str]:
+        return [
+            f"  {name}  {amt:,}원"
+            for name, amt in zip(rng.sample(names, len(amounts)), amounts, strict=True)
+        ]
+
+    current_lines = rows(_CURRENT_ASSETS, current_parts)
+    noncurrent_lines = rows(_NONCURRENT_ASSETS, noncurrent_parts)
+    liab_lines = rows(_LIABILITIES, liab_parts)
+    equity_lines = rows(_EQUITY, equity_parts)
+
+    current_line = f"유동자산  {current:,}원"
+    noncurrent_line = f"비유동자산  {noncurrent:,}원"
+    assets_line = f"자산총계  {assets:,}원"
+    liab_line = f"부채총계  {liabilities:,}원"
+    equity_line = f"자본총계  {equity:,}원"
+    liab_equity_line = f"부채와자본총계  {assets:,}원"
+
+    lines = [
+        "표준재무상태표",
+        f"{company}  제{term}기  2026년 12월 31일 현재",
+        "(단위: 원)",
+        "",
+        "[자산]",
+        *current_lines,
+        current_line,
+        *noncurrent_lines,
+        noncurrent_line,
+        assets_line,
+        "",
+        "[부채와 자본]",
+        *liab_lines,
+        liab_line,
+        *equity_lines,
+        equity_line,
+        liab_equity_line,
+    ]
+    fields = [
+        GenField("current_assets", f"{current:,}원", current, current_line),
+        GenField("noncurrent_assets", f"{noncurrent:,}원", noncurrent, noncurrent_line),
+        GenField("total_assets", f"{assets:,}원", assets, assets_line),
+        GenField("total_liabilities", f"{liabilities:,}원", liabilities, liab_line),
+        GenField("total_equity", f"{equity:,}원", equity, equity_line),
+        GenField("total_liab_equity", f"{assets:,}원", assets, liab_equity_line),
+    ]
+    swap_sources = [
+        (amt, line)
+        for amt, line in zip(
+            current_parts + noncurrent_parts + liab_parts + equity_parts,
+            current_lines + noncurrent_lines + liab_lines + equity_lines,
+            strict=True,
+        )
+    ]
+    return BuiltDoc("balance_sheet", "\n".join(lines) + "\n", fields, swap_sources)
+
+
 # --- error injection -----------------------------------------------------------
 
 
@@ -277,7 +370,12 @@ def _generate_doc(
     packs: dict[str, RulePack],
 ) -> tuple[BuiltDoc, str | None]:
     for _ in range(MAX_DOC_ATTEMPTS):
-        doc = _build_tax(rng, with_items) if doc_type == "tax_invoice" else _build_stmt(rng)
+        if doc_type == "tax_invoice":
+            doc = _build_tax(rng, with_items)
+        elif doc_type == "statement":
+            doc = _build_stmt(rng)
+        else:
+            doc = _build_balance(rng)
         injected: str | None = None
         if kind == "ungrounded":
             injected = _inject_ungrounded(rng, doc)
@@ -293,19 +391,22 @@ def _generate_doc(
 # --- orchestration -------------------------------------------------------------
 
 
-def generate(count_tax: int, count_stmt: int, seed: int, out_dir: Path) -> dict:
+def generate(
+    count_tax: int, count_stmt: int, count_balance: int, seed: int, out_dir: Path
+) -> dict:
     """Generate the synthetic golden set; return generation statistics."""
     rng = random.Random(seed)
     packs = {
-        "tax_invoice": load_rule_pack(RULES_DIR / "tax_invoice.yaml"),
-        "statement": load_rule_pack(RULES_DIR / "statement.yaml"),
+        doc_type: load_rule_pack(RULES_DIR / f"{doc_type}.yaml") for doc_type in _RULE_FIELDS
     }
 
     # Every 3rd tax invoice also extracts line items (exercises the sum rule).
     layouts = [("tax_invoice", i % 3 == 0) for i in range(count_tax)]
     layouts += [("statement", False) for _ in range(count_stmt)]
+    layouts += [("balance_sheet", False) for _ in range(count_balance)]
+    per_doc = {"statement": 2, "balance_sheet": 6}
     total_fields = sum(
-        (5 if with_items else 3) if doc_type == "tax_invoice" else 2
+        (5 if with_items else 3) if doc_type == "tax_invoice" else per_doc[doc_type]
         for doc_type, with_items in layouts
     )
 
@@ -324,8 +425,8 @@ def generate(count_tax: int, count_stmt: int, seed: int, out_dir: Path) -> dict:
     for stale in sorted(out_dir.glob("gen_*.json")):
         stale.unlink()  # regenerate our own files only; hand-written goldens stay
 
-    prefix = {"tax_invoice": "gen_tax", "statement": "gen_stmt"}
-    counters = {"tax_invoice": 0, "statement": 0}
+    prefix = {"tax_invoice": "gen_tax", "statement": "gen_stmt", "balance_sheet": "gen_bs"}
+    counters = dict.fromkeys(_RULE_FIELDS, 0)
     written: list[str] = []
     for idx, (doc_type, with_items) in enumerate(layouts):
         kind = schedule.get(idx)
@@ -354,6 +455,7 @@ def generate(count_tax: int, count_stmt: int, seed: int, out_dir: Path) -> dict:
         "docs": len(layouts),
         "tax_docs": count_tax,
         "stmt_docs": count_stmt,
+        "balance_docs": count_balance,
         "fields": total_fields,
         "bad_fields": n_bad,
         "ungrounded": n_bad - n_swap,
@@ -368,7 +470,10 @@ def _print_stats(stats: dict) -> None:
     fields = stats["fields"]
     rate = stats["bad_fields"] / fields if fields else 0.0
     print("=== NumHall-KR golden generator ===")
-    print(f"seed={stats['seed']}  tax={stats['tax_docs']}  stmt={stats['stmt_docs']}")
+    print(
+        f"seed={stats['seed']}  tax={stats['tax_docs']}  "
+        f"stmt={stats['stmt_docs']}  balance={stats['balance_docs']}"
+    )
     print(f"out: {stats['out_dir']}")
     print(
         f"docs written: {stats['docs']} "
@@ -387,12 +492,17 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--count-tax", type=int, default=30, help="tax invoices (default 30)")
     parser.add_argument("--count-stmt", type=int, default=10, help="statements (default 10)")
+    parser.add_argument(
+        "--count-balance", type=int, default=10, help="balance sheets (default 10)"
+    )
     parser.add_argument("--seed", type=int, default=42, help="RNG seed (default 42)")
     parser.add_argument(
         "--out-dir", type=Path, default=DEFAULT_OUT_DIR, help="output dir (default bench/golden)"
     )
     args = parser.parse_args(argv)
-    stats = generate(args.count_tax, args.count_stmt, args.seed, args.out_dir)
+    stats = generate(
+        args.count_tax, args.count_stmt, args.count_balance, args.seed, args.out_dir
+    )
     _print_stats(stats)
 
 

@@ -1,21 +1,24 @@
 {
   "doc_id": "gen_stmt_003",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n한결시스템 주식회사  2026년 04월 05일 현재\n(단위: 원)\n\n계정과목  차변  대변\n비품  차변 29,847,000원\n보통예금  차변 32,930,000원\n선수금  대변 41,273,000원\n매출  대변 16,801,000원\n단기차입금  대변 4,703,000원\n\n차변 합계  62,777,000원\n대변 합계  62,777,000원\n",
-  "injected_error": null,
+  "full_text": "합계잔액시산표\n(주)가온소프트  2026년 05월 15일 현재\n(단위: 원)\n\n계정과목  차변  대변\n지급수수료  차변 48,737,000원\n보통예금  차변 10,209,000원\n선수금  대변 16,987,000원\n자본금  대변 12,509,000원\n매출  대변 29,450,000원\n\n차변 합계  58,946,000원\n대변 합계  58,946,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "debit_total"
+  },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "62,777,000원",
-      "number": 62777000,
-      "grounding_quote": "차변 합계  62,777,000원",
-      "expected_verdict": "verified"
+      "raw": "31,573,195원",
+      "number": 31573195,
+      "grounding_quote": "차변 합계  31,573,195원",
+      "expected_verdict": "discarded"
     },
     {
       "field": "credit_total",
-      "raw": "62,777,000원",
-      "number": 62777000,
-      "grounding_quote": "대변 합계  62,777,000원",
+      "raw": "58,946,000원",
+      "number": 58946000,
+      "grounding_quote": "대변 합계  58,946,000원",
       "expected_verdict": "verified"
     }
   ]

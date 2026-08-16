@@ -24,7 +24,12 @@ GOLDEN = ROOT / "bench" / "golden"
 RULES = ROOT / "rules"
 
 # Hand-written clean goldens that must always be present and fully verified.
-CLEAN_MANUAL_DOCS = ("tax_clean_01", "tax_clean_02", "statement_clean_01")
+CLEAN_MANUAL_DOCS = (
+    "tax_clean_01",
+    "tax_clean_02",
+    "statement_clean_01",
+    "balance_clean_01",
+)
 
 
 @cache
@@ -40,7 +45,10 @@ def test_golden_set_loads():
     ids = [d.doc_id for d in docs]
     assert len(ids) == len(set(ids))  # doc_ids stay unique across gen_*/manual
     assert all(d.fields for d in docs)
-    assert all(d.doc_type in ("tax_invoice", "statement") for d in docs)
+    assert all(d.doc_type in ("tax_invoice", "statement", "balance_sheet") for d in docs)
+    # every shipped rule pack is exercised — a pack the benchmark never runs is
+    # a pack whose regressions nobody would notice
+    assert {d.doc_type for d in docs} == {p.stem for p in RULES.glob("*.yaml")}
     assert m["total_fields"] == sum(len(d.fields) for d in docs)
 
 
@@ -97,8 +105,9 @@ def _load_generator():
 def test_generator_is_deterministic_and_gate_safe(tmp_path):
     gen = _load_generator()
     out_a, out_b = tmp_path / "a", tmp_path / "b"
-    stats = gen.generate(count_tax=4, count_stmt=2, seed=7, out_dir=out_a)
-    gen.generate(count_tax=4, count_stmt=2, seed=7, out_dir=out_b)
+    kwargs = dict(count_tax=4, count_stmt=2, count_balance=2, seed=7)
+    stats = gen.generate(**kwargs, out_dir=out_a)
+    gen.generate(**kwargs, out_dir=out_b)
 
     names = sorted(p.name for p in out_a.glob("gen_*.json"))
     assert names == sorted(p.name for p in out_b.glob("gen_*.json"))

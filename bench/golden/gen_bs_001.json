@@ -1,0 +1,53 @@
+{
+  "doc_id": "gen_bs_001",
+  "doc_type": "balance_sheet",
+  "full_text": "표준재무상태표\n주식회사 한빛상사  제14기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  선급금  6,499,000원\n  재고자산  16,931,000원\n  매출채권  1,466,000원\n유동자산  24,896,000원\n  기계장치  418,000원\n  토지  2,272,000원\n비유동자산  2,690,000원\n자산총계  27,586,000원\n\n[부채와 자본]\n  장기차입금  19,675,000원\n  단기차입금  2,747,000원\n  매입채무  424,000원\n부채총계  22,846,000원\n  자본잉여금  4,637,000원\n  이익잉여금  103,000원\n자본총계  4,740,000원\n부채와자본총계  27,586,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "current_assets"
+  },
+  "fields": [
+    {
+      "field": "current_assets",
+      "raw": "47,572,000원",
+      "number": 47572000,
+      "grounding_quote": "유동자산  47,572,000원",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "noncurrent_assets",
+      "raw": "2,690,000원",
+      "number": 2690000,
+      "grounding_quote": "비유동자산  2,690,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_assets",
+      "raw": "27,586,000원",
+      "number": 27586000,
+      "grounding_quote": "자산총계  27,586,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liabilities",
+      "raw": "22,846,000원",
+      "number": 22846000,
+      "grounding_quote": "부채총계  22,846,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_equity",
+      "raw": "4,740,000원",
+      "number": 4740000,
+      "grounding_quote": "자본총계  4,740,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liab_equity",
+      "raw": "27,586,000원",
+      "number": 27586000,
+      "grounding_quote": "부채와자본총계  27,586,000원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "doc_id": "gen_bs_010",
+  "doc_type": "balance_sheet",
+  "full_text": "표준재무상태표\n(주)누리상사  제5기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  매출채권  10,521,000원\n  선급금  401,000원\n  단기금융상품  12,181,000원\n유동자산  23,103,000원\n  토지  5,270,000원\n  무형자산  16,888,000원\n비유동자산  22,158,000원\n자산총계  45,261,000원\n\n[부채와 자본]\n  장기차입금  9,445,000원\n  매입채무  6,791,000원\n  단기차입금  5,379,000원\n부채총계  21,615,000원\n  이익잉여금  1,203,000원\n  자본잉여금  16,823,000원\n  자본금  5,620,000원\n자본총계  23,646,000원\n부채와자본총계  45,261,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "current_assets"
+  },
+  "fields": [
+    {
+      "field": "current_assets",
+      "raw": "47,519,000원",
+      "number": 47519000,
+      "grounding_quote": "유동자산  47,519,000원",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "noncurrent_assets",
+      "raw": "22,158,000원",
+      "number": 22158000,
+      "grounding_quote": "비유동자산  22,158,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_assets",
+      "raw": "45,261,000원",
+      "number": 45261000,
+      "grounding_quote": "자산총계  45,261,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liabilities",
+      "raw": "21,615,000원",
+      "number": 21615000,
+      "grounding_quote": "부채총계  21,615,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_equity",
+      "raw": "23,646,000원",
+      "number": 23646000,
+      "grounding_quote": "자본총계  23,646,000원",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "total_liab_equity",
+      "raw": "45,261,000원",
+      "number": 45261000,
+      "grounding_quote": "부채와자본총계  45,261,000원",
+      "expected_verdict": "verified"
+    }
+  ]
+}

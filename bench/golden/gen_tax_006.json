@@ -1,28 +1,31 @@
 {
   "doc_id": "gen_tax_006",
   "doc_type": "tax_invoice",
-  "full_text": "전자세금계산서\n승인번호: 20260326-61642594-61220073\n작성일자: 2026-03-26\n공급자: 한결시스템 주식회사 (등록번호 710-69-79352)\n공급받는자: (주)미래유통 (등록번호 357-80-11504)\n\n품목: 시스템 유지보수\n\n공급가액  41,220,000원\n세액  4,122,000원\n합계금액  45,342,000원\n",
-  "injected_error": null,
+  "full_text": "전자세금계산서\n승인번호: 20260317-95758349-78137358\n작성일자: 2026-03-17\n공급자: (주)미래유통 (등록번호 723-35-30032)\n공급받는자: 청람테크 주식회사 (등록번호 482-30-80697)\n\n품목: 홈페이지 제작\n\n공급가액  32,906,000원\n세액  3,290,600원\n합계금액  36,196,600원\n",
+  "injected_error": {
+    "kind": "field-swap",
+    "field": "supply"
+  },
   "fields": [
     {
       "field": "supply",
-      "raw": "41,220,000원",
-      "number": 41220000,
-      "grounding_quote": "공급가액  41,220,000원",
-      "expected_verdict": "verified"
+      "raw": "36,196,600원",
+      "number": 36196600,
+      "grounding_quote": "합계금액  36,196,600원",
+      "expected_verdict": "discarded"
     },
     {
       "field": "vat",
-      "raw": "4,122,000원",
-      "number": 4122000,
-      "grounding_quote": "세액  4,122,000원",
+      "raw": "3,290,600원",
+      "number": 3290600,
+      "grounding_quote": "세액  3,290,600원",
       "expected_verdict": "verified"
     },
     {
       "field": "total",
-      "raw": "45,342,000원",
-      "number": 45342000,
-      "grounding_quote": "합계금액  45,342,000원",
+      "raw": "36,196,600원",
+      "number": 36196600,
+      "grounding_quote": "합계금액  36,196,600원",
       "expected_verdict": "verified"
     }
   ]
