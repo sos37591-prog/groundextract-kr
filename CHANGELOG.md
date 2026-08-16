@@ -11,6 +11,15 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
+_Nothing yet. See the roadmap in [README.md](README.md#roadmap)._
+
+## [0.1.2] - 2026-08-16
+
+Precision, coverage and reach: the gate now says *which* value broke a rule instead
+of blaming every field the rule mentions, the benchmark exercises every shipped
+rule pack, the AGPL dependency is gone, and you can run the gate on your own
+files without writing code.
+
 ### Added
 
 - **Fault localization.** A violated invariant names several fields but indicts

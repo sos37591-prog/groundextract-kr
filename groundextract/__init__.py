@@ -17,7 +17,7 @@ from .models import (
 )
 from .rules import RulePack, default_rules_dir, evaluate_pack, load_rule_pack
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 def available_doc_types() -> list[str]:

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "groundextract"
-version = "0.1.1"
+version = "0.1.2"
 description = "Value-level truth gate for Korean regulatory documents: verbatim grounding + arithmetic rules + auto-discard of hallucinated numbers."
 readme = "README.md"
 requires-python = ">=3.11"
