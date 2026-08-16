@@ -117,11 +117,25 @@ def build_invoice() -> dict:
 # --------------------------------------------------------------------------- #
 # ② 표준재무상태표 (rendered from the committed synthetic sample)
 # --------------------------------------------------------------------------- #
-SRC_PDF = Path(os.environ.get(
-    "GEK_BALANCE_PDF", str(ROOT / "viewer" / "samples" / "balance_sheet_sample.pdf")))
+SAMPLE_PDF = ROOT / "viewer" / "samples" / "balance_sheet_sample.pdf"
+SRC_PDF = Path(os.environ.get("GEK_BALANCE_PDF", str(SAMPLE_PDF)))
 BS_PAGE = 0
 Z = 2.0
-BS_IMG = ROOT / "viewer" / "assets" / "balance_sheet_demo.png"
+
+# This page is rendered wholesale — there is no masking step for it, unlike the
+# tax invoice above, because the committed sample is synthetic and has nothing to
+# mask. That makes the output path a safety question rather than a preference: a
+# real 재무제표 passed via GEK_BALANCE_PDF would otherwise be rasterized straight
+# over a *tracked* asset, putting 사업자등록번호·법인명·전 계정과목 금액 one
+# `git add .` away from a public repository (and GitHub keeps old blobs reachable
+# even after a force-push). So only the synthetic sample may write to the tracked
+# demo asset; anything else goes to gitignored local/.
+_FROM_SAMPLE = SRC_PDF.resolve() == SAMPLE_PDF.resolve()
+BS_IMG = (
+    ROOT / "viewer" / "assets" / "balance_sheet_demo.png"
+    if _FROM_SAMPLE
+    else ROOT / "local" / "balance_sheet_demo.png"
+)
 BS_FIELDS = [
     ("current_assets", "유동자산", 398_180_000, "L"),
     ("noncurrent_assets", "비유동자산", 39_431_995, "L"),
@@ -142,6 +156,14 @@ def build_balance() -> dict:
             f"balance-sheet source not found: {SRC_PDF}\n"
             "Expected the committed synthetic sample at viewer/samples/, or set "
             "GEK_BALANCE_PDF to your own document."
+        )
+    if not _FROM_SAMPLE:
+        print(
+            f"! {SRC_PDF.name} is not the committed synthetic sample.\n"
+            f"! Rendering it unmasked to {BS_IMG} (gitignored) instead of the\n"
+            f"! tracked demo asset. Review the image before publishing anything\n"
+            f"! derived from it.",
+            file=sys.stderr,
         )
     doc = fitz.open(SRC_PDF)
     page = doc[BS_PAGE]

@@ -1,4 +1,6 @@
-# Keep the demo image small and reproducible: ship source + rules + golden set only.
+# The Dockerfile uses an allowlist of COPY paths, so this file is only a second
+# line of defence (and keeps the build context small). Anything private listed
+# here is also absent from the image because it was never named for copying.
 .git
 .github
 .venv
@@ -16,11 +18,16 @@ dist
 coverage.xml
 htmlcov
 sbom
+# Private / unmasked sources — mirrors .gitignore. Never let these into a layer.
 local
 submission
 docs
+CLAUDE.md
+bench/sample_pdf/real_*
 .env
+.env.*
 *.local
+*.local.*
 .idea
 .vscode
 .DS_Store

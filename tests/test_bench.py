@@ -11,11 +11,12 @@ labeled bad-rate computed from the loaded set itself.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from functools import cache
 from pathlib import Path
 
-from groundextract.bench import compute_metrics, load_golden_dir, run_bench
+from groundextract.bench import compute_metrics, load_golden_dir, main, run_bench
 from groundextract.models import Verdict
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -113,3 +114,45 @@ def test_generator_is_deterministic_and_gate_safe(tmp_path):
     assert m["numeric_hallucination_rate_after"] == 0.0
     assert m["ground_truth_bad"] == stats["bad_fields"]
     assert stats["field_swap"] > 0  # arithmetic-only catches are always included
+
+
+# --- an empty run is an error, not a perfect score -----------------------------
+#
+# Every rate here is a ratio whose denominator is the label count, so measuring
+# nothing produced a flawless scorecard: 100% recall, 100% grounded-accuracy, a
+# 0% post-gate hallucination rate — and exit 0, so a typo'd path in CI passed.
+# These numbers are published as part of the project's public contract, so the
+# empty case has to be loud.
+
+
+def test_missing_golden_directory_is_an_error(tmp_path, capsys):
+    code = main([str(tmp_path / "does_not_exist")])
+    assert code != 0
+    err = capsys.readouterr().err
+    assert "not found" in err
+
+
+def test_empty_golden_directory_is_an_error(tmp_path, capsys):
+    code = main([str(tmp_path)])
+    assert code != 0
+    err = capsys.readouterr().err
+    assert "no golden documents" in err
+    assert "zero labels" in err
+
+
+def test_documents_without_labeled_fields_are_an_error(tmp_path, capsys):
+    (tmp_path / "empty_doc.json").write_text(
+        json.dumps({"doc_id": "d", "doc_type": "tax_invoice", "full_text": "x", "fields": []}),
+        encoding="utf-8",
+    )
+    code = main([str(tmp_path)])
+    assert code != 0
+    assert "no labeled" in capsys.readouterr().err
+
+
+def test_a_real_golden_set_still_reports_and_succeeds(capsys):
+    code = main([str(GOLDEN)])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "NumHall-KR benchmark" in out
+    assert "json:" in out

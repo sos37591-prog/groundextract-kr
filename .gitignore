@@ -20,15 +20,41 @@ htmlcov/
 # SBOM (CI-generated; regenerated each run)
 sbom/*.json
 
+# Notebooks / JS tooling (viewer is build-step-free today; keep it that way)
+.ipynb_checkpoints/
+node_modules/
+.tox/
+.nox/
+
 # Editors / OS
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Secrets / local env
+# Secrets / local env.
+# Patterns, not filenames: every rule below exists because *this* repository
+# handles real 세무·재무 documents, and a denylist of known names only protects
+# against the mistakes already made. `.env` alone missed `.env.production`;
+# `*.local` alone missed `config.local.json`.
 .env
+.env.*
+.envrc
 *.local
+*.local.*
+*.key
+*.pem
+*.pfx
+*.p12
+*token*
+credentials.json
+service-account.json
+
+# Runtime artifacts
+*.log
+*.sqlite
+*.db
 
 # Contest submission artifacts (개인정보/PII 포함 — keep out of public repo)
 submission/
@@ -40,6 +66,8 @@ docs/
 # Do not rely on a global gitignore for this — it must be excluded on any machine.
 CLAUDE.md
 
-# Unmasked real sources (PII / 실제 기업 재무·세무 원본) — never commit
-bench/sample_pdf/real_tax_invoice.png
+# Unmasked real sources (PII / 실제 기업 재무·세무 원본) — never commit.
+# Prefixed by convention rather than named one by one: the next real document
+# someone drops in must be excluded before it exists, not after.
+bench/sample_pdf/real_*
 local/

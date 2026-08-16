@@ -7,8 +7,8 @@ invented (numeric hallucination) has no verbatim support and must fail here.
 
 Three-tier, deterministic judgement (no randomness, no network):
 
-  1. EXACT           - the value string is a verbatim substring of the source.
-  2. PARTIAL_NUMERIC - the *number* appears, only the formatting differs
+  1. EXACT           - the value string occurs verbatim in the source.
+  2. PARTIAL_NUMERIC - the *number* occurs, only the formatting differs
                        (thousands separators, currency symbols, decimals,
                        full-width digits, Korean units like 원/₩, and the
                        KR negative notations △/▲ and accounting parentheses).
@@ -17,6 +17,19 @@ Three-tier, deterministic judgement (no randomness, no network):
                        **Non-numeric values only** - see below.
 
 Anything below the fuzzy threshold => MatchKind.NONE (ungrounded).
+
+Which tier is even reachable depends on what the value is, and the split matters
+more than the tiers themselves:
+
+  * A value holding **one number** is decided by comparing canonical number
+    *tokens*, never by substring. "1,000,000원" occurs inside "11,000,000원", so
+    a substring test would accept a 10x digit shift - the most common OCR/LLM
+    corruption - as verbatim evidence for a document that never said it. EXACT
+    is then only a label applied on top of a token match that already succeeded.
+  * A value holding **digits but no single number** ("1 234 567원", "2026-08-16")
+    has no canonical figure to compare and must occur verbatim or not at all.
+  * A value holding **no digits** (상호·품목 등) is the only one offered the
+    fuzzy tier.
 
 Why FUZZY never applies to a numeric value
 ------------------------------------------
@@ -37,11 +50,24 @@ from __future__ import annotations
 import re
 import unicodedata
 from difflib import SequenceMatcher
+from functools import lru_cache
 
 from .models import Check, MatchKind
 
 # Ratio at/above which a normalized fuzzy match is accepted (text values only).
 FUZZY_THRESHOLD = 0.87
+
+# Largest source the fuzzy tier will walk. Fuzzy matching slides a window across
+# the whole source for *every* value compared, so its cost is
+# O(len(source)) per value with a SequenceMatcher call at each step — by far the
+# most expensive path here, and the only one that was unbounded. A caller handing
+# a multi-megabyte "document" plus a few dozen textual values could buy minutes
+# of CPU with one well-formed request, and a server processing requests in
+# sequence (as the MCP stdio loop does) stops answering anyone else meanwhile.
+# Past this size the tier declines instead of grinding: refusing to ground is the
+# fail-closed direction, so the worst outcome is a discarded field — never a
+# false verification. Real regulatory documents are far below the limit.
+MAX_FUZZY_SOURCE_CHARS = 64 * 1024
 
 # Characters that are noise around numbers in KR financial docs.
 _CURRENCY_UNITS = ("원", "₩", "KRW", "krw")
@@ -74,6 +100,50 @@ def _nfkc(text: str) -> str:
     return unicodedata.normalize("NFKC", text)
 
 
+def _drop_enclosed_numerals(text: str) -> str:
+    """Remove numerals that are notation rather than quantity (①, ⑴, ², ½).
+
+    NFKC rewrites these to bare digits, which would hand the matcher number
+    tokens that are not amounts at all — Korean forms number their line items
+    ①②③, so a document would offer a "1", a "2" and a "3" as grounding for
+    figures it never stated. Unicode already separates the two cases: enclosed,
+    superscript and fraction forms are category ``No`` (other number), while
+    full-width digits (１２３) — which are genuinely digits, just typeset wide —
+    are ``Nd`` and must survive.
+    """
+    return "".join(ch for ch in text if unicodedata.category(ch) != "No")
+
+
+#: Normalizing a document is O(len(text)), and the gate compares *every*
+#: extracted value against the *same* ``full_text`` — so the naive path pays for
+#: the whole document once per field, which is what made a large document
+#: expensive enough to matter (see :data:`MAX_FUZZY_SOURCE_CHARS`). One request
+#: touches one or two distinct sources, so a small cache collapses that to a
+#: single pass. Python memoizes ``str`` hashes on the object, so repeat lookups
+#: with the same document are O(1) rather than O(len(text)).
+_NORMALIZE_CACHE_SIZE = 8
+
+#: Only inputs at least this long are cached. Values are short and every field
+#: brings a different one, so caching them would evict the one entry that
+#: actually pays for itself — the document — on every single comparison, which
+#: is the same cost as having no cache at all.
+_CACHE_MIN_CHARS = 4096
+
+
+def _numeric_text_impl(text: str) -> str:
+    return _nfkc(_drop_enclosed_numerals(text))
+
+
+_numeric_text_cached = lru_cache(maxsize=_NORMALIZE_CACHE_SIZE)(_numeric_text_impl)
+
+
+def _numeric_text(text: str) -> str:
+    """Text prepared for number tokenization (document-sized inputs cached)."""
+    if len(text) < _CACHE_MIN_CHARS:
+        return _numeric_text_impl(text)
+    return _numeric_text_cached(text)
+
+
 def _canonical_number(token: str) -> str:
     """Canonicalize one ``_NUMBER_TOKEN`` match into a comparable key string."""
     tok = token.strip()
@@ -93,29 +163,126 @@ def _canonical_number(token: str) -> str:
 
 
 def normalize_number_str(s: str) -> str | None:
-    """Extract a canonical numeric key from a string, or None if no number.
+    """Extract a canonical numeric key from a string, or None if there is no
+    *single* number in it.
 
     "1,000,000원" -> "1000000"   ;   "₩ 1,000,000.00" -> "1000000"
     "10%" -> "10"                ;   "-500" -> "-500"
     "△1,234" -> "-1234"          ;   "(1,234)" -> "-1234"
     Trailing ``.0`` zeros are trimmed so 100 == 100.00.
+
+    A string holding **more than one** number token has no single canonical
+    reading and returns ``None``. Taking the first token instead was a quiet
+    source of false evidence: space-separated thousands ("1 234 567원", common
+    in OCR output and European typesetting) reduced to the key ``"1"``, which
+    then matched any stray "1" in the document. Callers must treat ``None`` as
+    "not a single number", never as "no digits" — see :func:`match_value`, which
+    still refuses fuzzy matching for such a string.
     """
-    s = _nfkc(s)
+    s = _numeric_text(s)
     for unit in _CURRENCY_UNITS:
         s = s.replace(unit, "")
-    m = _NUMBER_TOKEN.search(s)
-    if not m:
+    tokens = _NUMBER_TOKEN.findall(s)
+    if len(tokens) != 1:
         return None
-    return _canonical_number(m.group(0))
+    return _canonical_number(tokens[0])
+
+
+def _number_keys_impl(text: str) -> dict[str, str]:
+    """Map every number in ``text`` to the first token that spelled it.
+
+    Built once per source instead of re-scanning the whole document for each
+    value compared against it — the difference between O(fields x document) and
+    O(document) on a request that verifies dozens of fields.
+    """
+    keys: dict[str, str] = {}
+    for m in _NUMBER_TOKEN.finditer(_numeric_text(text)):
+        tok = m.group(0)
+        keys.setdefault(_canonical_number(tok), tok)
+    return keys
+
+
+_number_keys_cached = lru_cache(maxsize=_NORMALIZE_CACHE_SIZE)(_number_keys_impl)
+
+
+def _number_keys(text: str) -> dict[str, str]:
+    """Number index for a source (document-sized inputs cached). Read-only."""
+    if len(text) < _CACHE_MIN_CHARS:
+        return _number_keys_impl(text)
+    return _number_keys_cached(text)
+
+
+def _normalize_text_impl(text: str) -> str:
+    return re.sub(r"\s+", " ", _nfkc(text)).strip()
+
+
+_normalize_text_cached = lru_cache(maxsize=_NORMALIZE_CACHE_SIZE)(_normalize_text_impl)
 
 
 def _normalize_text(text: str) -> str:
-    """Whitespace/compat-normalize for fuzzy comparison."""
-    return re.sub(r"\s+", " ", _nfkc(text)).strip()
+    """Whitespace/compat-normalize for comparison (document-sized inputs cached)."""
+    if len(text) < _CACHE_MIN_CHARS:
+        return _normalize_text_impl(text)
+    return _normalize_text_cached(text)
 
 
 def _fuzzy_ratio(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
+
+
+def _best_fuzzy_ratio(v_norm: str, s_norm: str) -> float:
+    """Best ratio of the value against token-aligned spans of the source.
+
+    The candidates a fuzzy comparison is scored against decide what the tier
+    actually tolerates. Scoring against raw character slices whose width came
+    from the *value* length made it incoherent: a truncated value got a
+    correspondingly short window, which then matched its own surviving prefix
+    well. Against 상호 "주식회사 지티소프트", the six-character truncation
+    "주식회사 지티" scored 0.88 and passed, while the one-character slip
+    "주식회사 지티소프" — the far likelier OCR failure, and the one this tier
+    exists for — scored 0.80 and failed.
+
+    Spans that begin and end on token boundaries remove that artefact: every
+    candidate is a phrase the document actually contains, so the score reflects
+    how close the value is to something written there rather than to a slice
+    chosen to flatter it. The width is allowed to differ by one token, which
+    covers an extractor that swallowed or split a space.
+    """
+    tokens = s_norm.split(" ")
+    wanted = max(len(v_norm.split(" ")), 1)
+    best = 0.0
+    for width in sorted({max(wanted - 1, 1), wanted, wanted + 1}):
+        for i in range(0, max(len(tokens) - width + 1, 1)):
+            span = " ".join(tokens[i : i + width])
+            best = max(best, _fuzzy_ratio(v_norm, span))
+            if best >= FUZZY_THRESHOLD:
+                return best
+    return best
+
+
+def _occurs_standalone(needle: str, haystack: str) -> bool:
+    """True when ``needle`` occurs in ``haystack`` as a whole token, not a fragment.
+
+    A plain substring test accepts any slice of the document, which for a textual
+    field is the whole verification: 상호·품목 carry no arithmetic invariant, so
+    grounding is the only check they get. Against "상호 주식회사 지티소프트", the
+    substring test grounds "주식회사 지티소프" — and "주" — at confidence 1.0,
+    although a truncated company name is a *different company*, and dropping
+    trailing characters is exactly what OCR does.
+
+    The boundary is "not adjacent to another alphanumeric character" rather than
+    a whitespace rule: Korean does not space its syllables, but it does abut
+    punctuation, so 상호 followed by "," or ")" must still ground.
+    """
+    start = haystack.find(needle)
+    while start != -1:
+        end = start + len(needle)
+        before_ok = start == 0 or not haystack[start - 1].isalnum()
+        after_ok = end == len(haystack) or not haystack[end].isalnum()
+        if before_ok and after_ok:
+            return True
+        start = haystack.find(needle, start + 1)
+    return False
 
 
 def match_value(value: str, source: str) -> tuple[MatchKind, str]:
@@ -130,21 +297,26 @@ def match_value(value: str, source: str) -> tuple[MatchKind, str]:
     v_norm = _normalize_text(value)
     s_norm = _normalize_text(source)
 
-    # 1) EXACT verbatim substring (on NFKC/whitespace-normalized text).
-    if v_norm and v_norm in s_norm:
-        return MatchKind.EXACT, f"verbatim substring: {v_norm!r}"
-
-    # 2) PARTIAL NUMERIC: the number is present, formatting differs.
+    # 1) NUMERIC: decided by whole-number-token comparison, never by substring.
+    #
+    #    A raw substring test is unsound for numbers because a shorter figure is
+    #    a substring of a longer one: "1,000,000원" occurs inside "11,000,000원",
+    #    so a 10x-shifted amount - the dominant OCR/LLM digit error - would be
+    #    reported as verbatim evidence for a document that never contained it.
+    #    Comparing canonical *tokens* gives the digit boundary that substring
+    #    matching lacks. EXACT is still reported when the value string itself is
+    #    also present verbatim; that is a labelling detail on top of a match the
+    #    token comparison already established.
     v_num = normalize_number_str(value)
     if v_num is not None:
-        # collect every number token in the source and compare canonically
-        for m in _NUMBER_TOKEN.finditer(_nfkc(source)):
-            tok = m.group(0)
-            if _canonical_number(tok) == v_num:
-                return (
-                    MatchKind.PARTIAL_NUMERIC,
-                    f"number {v_num} present with different formatting ({tok!r})",
-                )
+        tok = _number_keys(source).get(v_num)
+        if tok is not None:
+            if v_norm and v_norm in s_norm:
+                return MatchKind.EXACT, f"verbatim substring: {v_norm!r}"
+            return (
+                MatchKind.PARTIAL_NUMERIC,
+                f"number {v_num} present with different formatting ({tok!r})",
+            )
         # Numeric values stop here: no fuzzy tier. An edit-distance ratio cannot
         # separate OCR noise from a genuinely different amount (1,900,000 vs
         # 1,000,000 scores 0.90), and 7-8 digit KRW figures - the bulk of tax
@@ -156,18 +328,37 @@ def match_value(value: str, source: str) -> tuple[MatchKind, str]:
             "(fuzzy matching is not applied to numeric values)",
         )
 
-    # 3) FUZZY: non-numeric values only (상호·품목 등). Sliding best window of
-    #    source vs value (OCR noise tolerance).
-    #    Compare against source substrings of similar length for a fair ratio.
-    best = 0.0
-    win = max(len(v_norm), 1)
-    # step through candidate windows; cap work for very long sources
-    step = max(win // 2, 1)
-    for i in range(0, max(len(s_norm) - win + 1, 1), step):
-        window = s_norm[i : i + win + 2]
-        best = max(best, _fuzzy_ratio(v_norm, window))
-        if best >= FUZZY_THRESHOLD:
-            break
+    # 1b) DIGIT-BEARING but not a single number ("1 234 567원", "2026-08-16",
+    #     "400,000 + 600,000"). There is no canonical figure to compare, and the
+    #     fuzzy tier must not see it either — an edit-distance ratio separates
+    #     "2026-08-16" from "2026-08-17" no better than it separates amounts. It
+    #     has to appear verbatim, as a whole token, or not at all.
+    if any(ch.isdigit() for ch in _nfkc(value)):
+        if v_norm and _occurs_standalone(v_norm, s_norm):
+            return MatchKind.EXACT, f"verbatim: {v_norm!r}"
+        return (
+            MatchKind.NONE,
+            "value carries digits but no single number; it must appear verbatim "
+            "(fuzzy matching is not applied to digit-bearing values)",
+        )
+
+    # 2) EXACT verbatim occurrence - textual values only (see above for why a
+    #    numeric value never reaches this branch). Whole-token, not substring:
+    #    a truncated 상호 is a different company, not weaker evidence for the
+    #    same one, and grounding is the *only* check a textual field gets.
+    if v_norm and _occurs_standalone(v_norm, s_norm):
+        return MatchKind.EXACT, f"verbatim: {v_norm!r}"
+
+    # 3) FUZZY: non-numeric values only (상호·품목 등), scored against
+    #    token-aligned spans of the source (OCR noise tolerance).
+    if len(s_norm) > MAX_FUZZY_SOURCE_CHARS:
+        return (
+            MatchKind.NONE,
+            f"source too large for fuzzy matching "
+            f"({len(s_norm)} chars > {MAX_FUZZY_SOURCE_CHARS}); "
+            "cite a grounding_quote to ground a textual value in a document this size",
+        )
+    best = _best_fuzzy_ratio(v_norm, s_norm)
     if best >= FUZZY_THRESHOLD:
         return MatchKind.FUZZY, f"fuzzy match ratio={best:.2f} (>= {FUZZY_THRESHOLD})"
 
@@ -177,24 +368,45 @@ def match_value(value: str, source: str) -> tuple[MatchKind, str]:
 def ground_value(value: str, grounding_quote: str | None, full_text: str) -> Check:
     """Produce a grounding ``Check`` for one extracted value.
 
-    Prefers the model-cited ``grounding_quote`` (must itself exist in the
-    document AND contain the value); falls back to the whole ``full_text``.
-    A passing check requires MatchKind in {EXACT, PARTIAL_NUMERIC, FUZZY} —
-    and FUZZY is unreachable for anything carrying a number, so a cited quote
-    whose figure is absent from the document is rejected outright.
+    When the model cites a ``grounding_quote``, **three** conditions must hold:
+
+      1. the quote occurs verbatim in ``full_text``,
+      2. the value occurs in the quote, and
+      3. the value *also* stands on its own against ``full_text``.
+
+    Without (1) and (3) a cited span can launder an invented figure. A quote is
+    itself a string carrying numbers, so judging its existence with the same
+    tiered matcher used for values accepted it as long as *one* of its numbers
+    appeared in the document: stapling a real figure onto an invented one
+    ("1,000,000 공급가액 2,000,000원") made the invented half count as verbatim
+    evidence. Condition (1) is therefore a plain verbatim test, and (3) re-checks
+    the value against the document with the digit-boundary-aware matcher so a
+    quote that is itself only a substring of a longer figure cannot stand in.
+
+    A passing check requires MatchKind in {EXACT, PARTIAL_NUMERIC, FUZZY} — and
+    FUZZY is unreachable for anything carrying a number.
     """
-    # If the model cited a quote, that quote must be real (exist in the doc)
-    # AND the value must live inside that quote. This blocks "cite a fake span".
     if grounding_quote:
-        quote_kind, _ = match_value(grounding_quote, full_text)
-        if quote_kind is MatchKind.NONE:
+        # (1) the cited span must be real, verbatim.
+        if _normalize_text(grounding_quote) not in _normalize_text(full_text):
             return Check(
                 name="grounding",
                 passed=False,
-                detail=f"cited quote not found in document: {grounding_quote!r}",
+                detail=f"cited quote not found verbatim in document: {grounding_quote!r}",
                 kind=MatchKind.NONE,
             )
+        # (2) the value must live inside the span the model pointed at.
         kind, detail = match_value(value, grounding_quote)
+        # (3) and it must survive on its own against the whole document.
+        if kind is not MatchKind.NONE:
+            doc_kind, doc_detail = match_value(value, full_text)
+            if doc_kind is MatchKind.NONE:
+                return Check(
+                    name="grounding",
+                    passed=False,
+                    detail=f"value not grounded in document: {doc_detail}",
+                    kind=MatchKind.NONE,
+                )
     else:
         kind, detail = match_value(value, full_text)
 

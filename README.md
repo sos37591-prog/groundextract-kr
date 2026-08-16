@@ -57,7 +57,7 @@ XX supply value=1,000,000원   verdict=discarded conf=0.0
        ! vat_equals_supply_x_10pct: 250,000 vs 100,000 (tol 1) -> diff 150,000
        ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
 XX vat    value=250,000원     verdict=discarded conf=0.0
-       ! grounding: cited quote not found in document: '세액  250,000원'
+       ! grounding: cited quote not found verbatim in document: '세액  250,000원'
        ! vat_equals_supply_x_10pct: 250,000 vs 100,000 (tol 1) -> diff 150,000
        ! total_equals_supply_plus_vat: 1,100,000 vs 1,250,000 (tol 1) -> diff 150,000
 XX total  value=1,100,000원   verdict=discarded conf=0.0
@@ -229,7 +229,7 @@ call returns the full audit trail — here, the same hallucinated VAT:
       "value": {"raw": "250,000원", "number": 250000.0, "grounding_quote": "세액  250,000원"},
       "checks": [
         {"name": "grounding", "passed": false,
-         "detail": "cited quote not found in document: '세액  250,000원'", "kind": "none"},
+         "detail": "cited quote not found verbatim in document: '세액  250,000원'", "kind": "none"},
         {"name": "vat_equals_supply_x_10pct", "passed": false,
          "detail": "250,000 vs 100,000 (tol 1) -> diff 150,000"}
       ],
@@ -386,11 +386,20 @@ Read these before trusting the gate in production:
 - **Rules are arithmetic, not semantic.** The gate verifies that numbers are consistent
   and present. It does not verify that the counterparty, date, or account classification
   is correct.
-- **The EXACT grounding tier has no token boundary.** It is a substring test, so
-  `match_value("1,234", "합계 21,234원")` grounds, and an unsigned value can ground against
-  a negative figure written as `△1,234`. The numeric tiers below it are boundary-aware;
-  this one is not yet. Per [SECURITY.md](SECURITY.md) a gate bypass is our highest-severity
-  class, so it is disclosed here rather than left to be discovered.
+- **Grounding proves the value is in the *text layer*, not that a human can see it.**
+  Evidence is checked against the text the PDF adapter extracts. Text that is invisible on
+  screen — white-on-white, 0pt, positioned off-page, or in an annotation layer — is part of
+  that text and grounds normally. A sender who plants an arithmetically consistent set of
+  invisible figures can therefore obtain `verified` for amounts a reader never sees. Treat
+  documents from untrusted senders as out of scope until visibility checking lands
+  (roadmap), or pre-flight them with a tool that flags hidden text.
+- **A cited quote is verified for existence, not for relevance.** The gate requires the
+  quote to occur verbatim and to contain the value, but it does not check that the quote is
+  the *right* line — a figure that legitimately appears elsewhere in the document (a
+  line-item unit price, a subtotal, a prior-period column) can ground a field it does not
+  belong to. Arithmetic rules catch most such mix-ups; a field no rule reaches is discarded
+  rather than trusted. Per [SECURITY.md](SECURITY.md) a gate bypass is our highest-severity
+  class, so this is disclosed here rather than left to be discovered.
 - **Unit scaling is not handled yet.** Statements printed in 천원/백만원 units are not
   rescaled before rule evaluation.
 - **`balance_sheet` is not yet in the benchmark.** Its rule pack, viewer fixture, and unit

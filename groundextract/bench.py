@@ -144,15 +144,45 @@ def format_report(metrics: dict) -> str:
     )
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> int:
+    """Run the benchmark. Returns a process exit code.
+
+    Zero golden documents is an error, not a perfect score. Every rate here is
+    a ratio whose denominator is the label count, so an empty (or mistyped)
+    directory reports 100% recall, 100% grounded-accuracy and a 0% hallucination
+    rate — a flawless scorecard produced by measuring nothing. These numbers are
+    published, so the failure mode has to be loud and the exit code non-zero.
+    """
     args = argv if argv is not None else sys.argv[1:]
     root = Path(__file__).resolve().parent.parent
     golden_dir = Path(args[0]) if args else root / "bench" / "golden"
+
+    if not golden_dir.is_dir():
+        print(f"error: golden directory not found: {golden_dir}", file=sys.stderr)
+        return 2
+
     docs = load_golden_dir(golden_dir)
+    if not docs:
+        print(
+            f"error: no golden documents (*.json) in {golden_dir}\n"
+            "       refusing to report metrics computed over zero labels.",
+            file=sys.stderr,
+        )
+        return 2
+
     metrics = compute_metrics(run_bench(docs, root / "rules"))
+    if metrics["total_fields"] == 0:
+        print(
+            f"error: {len(docs)} golden document(s) in {golden_dir} carry no labeled "
+            "fields;\n       refusing to report metrics computed over zero labels.",
+            file=sys.stderr,
+        )
+        return 2
+
     print(format_report(metrics))
     print("json:", json.dumps(metrics, ensure_ascii=False))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

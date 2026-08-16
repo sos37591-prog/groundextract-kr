@@ -53,6 +53,22 @@ SUPPORTED_DOC_TYPES: tuple[str, ...] = ("tax_invoice", "statement", "balance_she
 MAX_LINE_CHARS = 4 * 1024 * 1024
 MAX_ERROR_DETAIL_CHARS = 200
 
+#: Hard limits on the *shape* of a request, not just its size on the wire.
+#:
+#: A single line under ``MAX_LINE_CHARS`` can still describe an enormous amount
+#: of work — thousands of values, each compared against a multi-megabyte
+#: ``full_text``. The stdio loop answers requests one at a time, so a request
+#: that runs for minutes blocks every other caller on the same pipe. These caps
+#: bound the work a well-formed request can ask for; the grounding matcher has
+#: its own fail-closed cap for the same reason
+#: (:data:`groundextract.grounding.MAX_FUZZY_SOURCE_CHARS`).
+MAX_VALUES = 256
+MAX_VALUE_CHARS = 1024
+#: 256 KiB of extracted text is a very long regulatory document — the Korean
+#: forms this gate targets run to a few KiB. The cap is what bounds the worst
+#: case a caller can ask for (MAX_VALUES fields x this much text).
+MAX_FULL_TEXT_CHARS = 256 * 1024
+
 # JSON-RPC 2.0 error codes.
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
@@ -165,9 +181,19 @@ def _require_doc_type(args: dict[str, Any]) -> str:
     return doc_type
 
 
+def _require_bounded_str(args: dict[str, Any], key: str, limit: int) -> str:
+    """Validate a required string and cap its length."""
+    value = _require_str(args, key)
+    if len(value) > limit:
+        raise InvalidParamsError(f"'{key}' exceeds {limit} characters")
+    return value
+
+
 def _parse_values(raw_values: object) -> list[ExtractedValue]:
     if not isinstance(raw_values, list):
         raise InvalidParamsError("'values' must be an array of objects")
+    if len(raw_values) > MAX_VALUES:
+        raise InvalidParamsError(f"'values' holds more than {MAX_VALUES} entries")
     parsed: list[ExtractedValue] = []
     for i, item in enumerate(raw_values):
         if not isinstance(item, dict):
@@ -176,6 +202,11 @@ def _parse_values(raw_values: object) -> list[ExtractedValue]:
         raw = item.get("raw")
         if not isinstance(field, str) or not isinstance(raw, str):
             raise InvalidParamsError(f"values[{i}] needs string 'field' and 'raw'")
+        for key, text in (("field", field), ("raw", raw)):
+            if len(text) > MAX_VALUE_CHARS:
+                raise InvalidParamsError(
+                    f"values[{i}].{key} exceeds {MAX_VALUE_CHARS} characters"
+                )
         number = item.get("number")
         if number is not None and (
             isinstance(number, bool) or not isinstance(number, int | float)
@@ -184,6 +215,10 @@ def _parse_values(raw_values: object) -> list[ExtractedValue]:
         quote = item.get("grounding_quote")
         if quote is not None and not isinstance(quote, str):
             raise InvalidParamsError(f"values[{i}].grounding_quote must be a string")
+        if quote is not None and len(quote) > MAX_VALUE_CHARS:
+            raise InvalidParamsError(
+                f"values[{i}].grounding_quote exceeds {MAX_VALUE_CHARS} characters"
+            )
         parsed.append(
             ExtractedValue(
                 field=field,
@@ -238,7 +273,7 @@ def _gate_payload(values: list[ExtractedValue], full_text: str, doc_type: str) -
 
 def _tool_verify_extraction(args: dict[str, Any]) -> dict[str, Any]:
     """Deterministic gate over caller-supplied extracted values. No keys, no network."""
-    full_text = _require_str(args, "full_text")
+    full_text = _require_bounded_str(args, "full_text", MAX_FULL_TEXT_CHARS)
     doc_type = _require_doc_type(args)
     values = _parse_values(args.get("values"))
     return _text_result(_gate_payload(values, full_text, doc_type))

@@ -23,6 +23,7 @@ arbitrary Python.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import operator
 from dataclasses import dataclass
 from pathlib import Path
@@ -82,6 +83,44 @@ def eval_expr(expr: str, env: dict[str, float]) -> float:
     return _eval_node(tree, env)
 
 
+class RulePackError(ValueError):
+    """A rule pack is malformed. Raised by :func:`load_rule_pack`.
+
+    Validation happens at load time on purpose. The rule pack is the one input
+    to this library a *user* writes by hand, so a typo in it is the most likely
+    error anyone will hit — and the failure has to name the file and the rule,
+    not surface as a bare ``SyntaxError`` from deep inside rule evaluation long
+    after the pack was loaded.
+    """
+
+
+def _parse_expr(expr: str, where: str) -> ast.Expression:
+    """Parse an expression and reject anything the safe evaluator cannot run."""
+    if not isinstance(expr, str) or not expr.strip():
+        raise RulePackError(f"{where}: 'expr' must be a non-empty string")
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as e:
+        raise RulePackError(f"{where}: cannot parse expr {expr!r} ({e.msg})") from e
+    for node in ast.walk(tree):
+        # ast.Load is the context every Name carries; it is structure, not syntax.
+        if isinstance(node, (ast.Expression, ast.Name, ast.Load)):
+            continue
+        if isinstance(node, ast.BinOp) and type(node.op) in _BIN_OPS:
+            continue
+        if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPS:
+            continue
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            continue
+        if isinstance(node, tuple(_BIN_OPS) + tuple(_UNARY_OPS)):
+            continue
+        raise RulePackError(
+            f"{where}: expr {expr!r} uses an unsupported element "
+            f"({type(node).__name__}); only + - * / and field names are allowed"
+        )
+    return tree
+
+
 # --- rule model ----------------------------------------------------------------
 
 
@@ -104,11 +143,104 @@ class RulePack:
     rules: list[Rule]
 
 
+#: Rule types the engine can evaluate. A pack naming anything else is a typo,
+#: and saying so at load time beats discovering it as a failed check per field.
+RULE_TYPES = ("equals", "sum")
+
+#: Ways a rule side can name a value.
+_SIDE_KEYS = ("field", "expr", "const")
+
+
+def _validate_side(side: object, where: str) -> None:
+    if not isinstance(side, dict):
+        raise RulePackError(f"{where}: expected a mapping like {{field: supply}}, got {side!r}")
+    present = [k for k in _SIDE_KEYS if k in side]
+    if len(present) != 1:
+        raise RulePackError(
+            f"{where}: needs exactly one of {', '.join(_SIDE_KEYS)}; got "
+            f"{sorted(side) or 'nothing'}"
+        )
+    key = present[0]
+    if key == "expr":
+        _parse_expr(side["expr"], where)
+    elif key == "field" and not isinstance(side["field"], str):
+        raise RulePackError(f"{where}: 'field' must be a field name, got {side['field']!r}")
+    elif key == "const" and not isinstance(side["const"], (int, float)):
+        raise RulePackError(f"{where}: 'const' must be a number, got {side['const']!r}")
+
+
+def _validate_rule(rule: Rule, where: str) -> None:
+    if not isinstance(rule.name, str) or not rule.name:
+        raise RulePackError(f"{where}: 'name' must be a non-empty string")
+    if rule.type not in RULE_TYPES:
+        raise RulePackError(
+            f"{where}: unknown rule type {rule.type!r}; expected one of {', '.join(RULE_TYPES)}"
+        )
+    if not isinstance(rule.tol, (int, float)) or isinstance(rule.tol, bool):
+        raise RulePackError(f"{where}: 'tol' must be a number, got {rule.tol!r}")
+
+    if rule.type == "equals":
+        for name in ("lhs", "rhs"):
+            side = getattr(rule, name)
+            if side is None:
+                raise RulePackError(f"{where}: an 'equals' rule needs both 'lhs' and 'rhs'")
+            _validate_side(side, f"{where}.{name}")
+    else:  # sum
+        if not isinstance(rule.target, str) or not rule.target:
+            raise RulePackError(f"{where}: a 'sum' rule needs a 'target' field name")
+        if not isinstance(rule.items, list) or not rule.items:
+            raise RulePackError(f"{where}: a 'sum' rule needs a non-empty 'items' list")
+        bad = [i for i in rule.items if not isinstance(i, str)]
+        if bad:
+            raise RulePackError(f"{where}: 'items' must be field names; got {bad!r}")
+
+
 def load_rule_pack(path: str | Path) -> RulePack:
-    """Load a YAML rule pack from disk."""
-    data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-    rules = [Rule(**r) for r in data.get("rules", [])]
-    return RulePack(doc_type=data.get("doc_type", "unknown"), rules=rules)
+    """Load and validate a YAML rule pack from disk.
+
+    Raises :class:`RulePackError` — naming the file and the offending rule — for
+    anything the engine could not evaluate later.
+    """
+    path = Path(path)
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as e:
+        raise RulePackError(f"cannot read rule pack {path}: {e}") from e
+    try:
+        data = yaml.safe_load(raw)
+    except yaml.YAMLError as e:
+        raise RulePackError(f"{path}: invalid YAML ({e})") from e
+
+    if not isinstance(data, dict):
+        raise RulePackError(
+            f"{path}: expected a mapping at the top level, got {type(data).__name__}"
+        )
+    doc_type = data.get("doc_type", "unknown")
+    if not isinstance(doc_type, str) or not doc_type:
+        raise RulePackError(f"{path}: 'doc_type' must be a non-empty string")
+
+    raw_rules = data.get("rules", [])
+    if not isinstance(raw_rules, list):
+        raise RulePackError(f"{path}: 'rules' must be a list, got {type(raw_rules).__name__}")
+
+    rules: list[Rule] = []
+    seen: set[str] = set()
+    for i, item in enumerate(raw_rules):
+        where = f"{path}: rules[{i}]"
+        if not isinstance(item, dict):
+            raise RulePackError(f"{where}: expected a mapping, got {type(item).__name__}")
+        try:
+            rule = Rule(**item)
+        except TypeError as e:
+            known = ", ".join(f.name for f in dataclasses.fields(Rule))
+            raise RulePackError(f"{where}: {e}; known keys are {known}") from e
+        _validate_rule(rule, f"{path}: rule {rule.name!r}")
+        if rule.name in seen:
+            raise RulePackError(f"{path}: duplicate rule name {rule.name!r}")
+        seen.add(rule.name)
+        rules.append(rule)
+
+    return RulePack(doc_type=doc_type, rules=rules)
 
 
 # --- evaluation ----------------------------------------------------------------
@@ -175,8 +307,32 @@ def evaluate_pack_with_fields(
     """
     evaluated: list[tuple[Check, set[str]]] = []
     for rule in pack.rules:
-        if _rule_applies(rule, env):
-            evaluated.append((evaluate_rule(rule, env), _referenced_fields(rule)))
+        # load_rule_pack rejects a malformed rule up front, but a RulePack can
+        # also be built in code, so a rule that cannot even be *read* must fail
+        # closed and visibly rather than raising out of the gate.
+        try:
+            referenced = _referenced_fields(rule)
+        except (SyntaxError, ValueError, TypeError) as e:
+            # Which fields the rule meant to check is exactly what could not be
+            # read, so the failure is attributed to every numeric field: a pack
+            # this broken has verified nothing, and saying so on each field beats
+            # a warning attached to none of them.
+            evaluated.append(
+                (
+                    Check(
+                        name=getattr(rule, "name", "<unnamed rule>") or "<unnamed rule>",
+                        passed=False,
+                        detail=(
+                            f"malformed rule; cannot determine which fields it checks ({e}). "
+                            "Load the pack with load_rule_pack() to have it validated."
+                        ),
+                    ),
+                    set(env),
+                )
+            )
+            continue
+        if _rule_applies_to(referenced, env):
+            evaluated.append((evaluate_rule(rule, env), referenced))
     return evaluated
 
 
@@ -202,7 +358,10 @@ def _referenced_fields(rule: Rule) -> set[str]:
 
 
 def _rule_applies(rule: Rule, env: dict[str, float]) -> bool:
-    ref = _referenced_fields(rule)
+    return _rule_applies_to(_referenced_fields(rule), env)
+
+
+def _rule_applies_to(ref: set[str], env: dict[str, float]) -> bool:
     # Apply only when the rule is fully evaluable (all fields present). This
     # keeps optional invariants (e.g. per-item sums) from failing when those
     # line items simply weren't part of the extraction.
