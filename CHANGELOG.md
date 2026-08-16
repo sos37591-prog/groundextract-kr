@@ -42,6 +42,29 @@ Benchmark numbers are part of the public contract: any release that changes
   the tie — which needs more overlapping invariants per document, not a smarter
   search. A single-rule pack like `statement` cannot localize at all.
 
+- **`groundextract verify` — the gate over your own files.** The library and the
+  MCP server could already verify an arbitrary extraction, but both asked you to
+  write code first, so trying this on a real document meant more work than the
+  demo suggested:
+
+  ```bash
+  python -m groundextract verify --doc doc.txt --values values.json --doc-type tax_invoice
+  ```
+
+  `--values` takes the same shape the MCP tool accepts (and literally the same
+  parser, so the two cannot drift). `--rules my_pack.yaml` uses a pack of your
+  own. **Exit code 1 when any field was discarded**, 0 when all survived, 2 on
+  usage errors — so `verify && ingest` is a safe pipeline gate. The bare command
+  still runs the demo.
+
+- **[`rules/README.md`](rules/README.md) — how to write a rule pack.** The one
+  part of this project users are expected to author had no guide; the field-name
+  contract, `expr` grammar and `tol` semantics had to be reverse-engineered from
+  the three shipped packs. It also documents the design choice that matters most
+  in practice: **write overlapping rules.** A field two invariants cover can be
+  cleared by the one that still holds when the other breaks; a field only one
+  covers cannot, which is why `statement` cannot localize a fault at all.
+
 - **`balance_sheet` is in NumHall-KR.** Its rule pack, viewer fixture and unit
   tests already existed, but the benchmark ran only `tax_invoice` and
   `statement` — a pack the benchmark never exercises is a pack whose regressions

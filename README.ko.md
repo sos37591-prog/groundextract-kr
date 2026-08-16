@@ -68,10 +68,38 @@ summary: {"total": 3, "verified": 1, "discarded": 2, "ungrounded": 1, "rule_pack
 따라서 지목되지 않습니다. 이 좁히기가 [fault localization](#numhall-kr-벤치마크)이며,
 좁히지 못하는 경우는 [한계](#한계)에서 공개합니다.
 
-이 명령은 내장 데모만 실행합니다. 문서 파일 인자를 받지 않으며(넘기면 처리한 척하지 않고
-그렇다고 알려줍니다), `--json`은 동일한 결과를 기계가 읽을 수 있는 JSON으로 출력합니다.
-패키지를 설치하면 동일한 동작의 `groundextract` 명령도 PATH에 등록됩니다.
-**내 문서**를 검증하려면 아래의 라이브러리 또는 MCP 서버를 쓰세요.
+`--json`은 동일한 결과를 기계가 읽을 수 있는 JSON으로 출력하며, 패키지를 설치하면
+동일한 동작의 `groundextract` 명령도 PATH에 등록됩니다.
+
+### 내 문서 검증하기
+
+```bash
+python -m groundextract verify --doc invoice.txt --values values.json --doc-type tax_invoice
+```
+
+`--doc`는 OCR/LLM이 숫자를 읽어낸 **평문 텍스트**, `--values`는 그 도구가 찾았다고 주장하는
+값입니다. MCP 툴과 같은 형식이며 `number`·`grounding_quote`는 선택입니다:
+
+```json
+[
+  {"field": "supply", "raw": "1,000,000원", "number": 1000000,
+   "grounding_quote": "공급가액  1,000,000원"},
+  {"field": "vat",    "raw": "100,000원"},
+  {"field": "total",  "raw": "1,100,000원"}
+]
+```
+
+직접 만든 룰팩은 `--doc-type` 대신 `--rules my_pack.yaml`을 쓰세요
+([rules/README.md](rules/README.md) 참조). **폐기된 필드가 하나라도 있으면 exit 1**이라
+파이프라인에서 그대로 게이트로 쓸 수 있습니다:
+
+```bash
+python -m groundextract verify --doc doc.txt --values values.json --doc-type tax_invoice   && ./ingest.sh          # 모든 값이 통과했을 때만 실행됨
+```
+
+이 명령은 추출기가 아닙니다 — 다른 도구가 만든 결과를 검증할 뿐입니다. 문서에서부터의
+전 과정은 [실문서 파이프라인](#실문서-파이프라인-옵션), 에이전트 연동은
+[MCP 서버](#mcp-서버--에이전트는-verified-값만-소비한다)를 보세요.
 
 ---
 

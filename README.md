@@ -75,11 +75,39 @@ explanation for what went wrong and is spared. That narrowing is
 [fault localization](#benchmark-numhall-kr); what it cannot narrow is discussed under
 [Limitations](#limitations).
 
-This command runs that built-in demo and nothing else: it takes no document argument (pass
-one and it says so instead of pretending to process it), and `--json` prints the same
-result as machine-readable JSON. Installing the package also puts an equivalent
-`groundextract` command on your PATH. To verify *your* numbers, use the library or the MCP
-server below.
+`--json` prints the same result as machine-readable JSON, and installing the package puts
+an equivalent `groundextract` command on your PATH.
+
+### Verify your own document
+
+```bash
+python -m groundextract verify --doc invoice.txt --values values.json --doc-type tax_invoice
+```
+
+`--doc` is the plain text your OCR/LLM read the numbers out of; `--values` is what it
+claims to have found — the same shape the MCP tool takes, with `number` and
+`grounding_quote` optional:
+
+```json
+[
+  {"field": "supply", "raw": "1,000,000원", "number": 1000000,
+   "grounding_quote": "공급가액  1,000,000원"},
+  {"field": "vat",    "raw": "100,000원"},
+  {"field": "total",  "raw": "1,100,000원"}
+]
+```
+
+Use `--rules my_pack.yaml` instead of `--doc-type` for a pack of your own (see
+[rules/README.md](rules/README.md)). **It exits 1 if any field was discarded**, so a
+pipeline can gate on it directly:
+
+```bash
+python -m groundextract verify --doc doc.txt --values values.json --doc-type tax_invoice   && ./ingest.sh          # only runs when every value survived
+```
+
+This is not an extractor — it verifies what some other tool produced. For the full
+document path see [Real-document pipeline](#real-document-pipeline-optional), and for
+agents the [MCP server](#mcp-server--agents-consume-only-verified-values).
 
 ---
 
