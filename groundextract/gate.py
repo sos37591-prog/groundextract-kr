@@ -60,10 +60,9 @@ from __future__ import annotations
 import math
 from collections import Counter
 from collections.abc import Iterable
-from itertools import combinations
 from typing import Any
 
-from .grounding import carries_number, ground_value, normalize_number_str
+from .grounding import FuzzyBudget, carries_number, ground_value, normalize_number_str
 from .models import Check, ExtractedValue, Verdict, VerifiedField
 from .rules import RulePack, evaluate_pack_with_fields, pack_fields
 
@@ -85,12 +84,16 @@ _GATE_CHECKS = frozenset(
     }
 )
 
-#: Ceilings on the fault-localization search. A rule pack references a handful of
-#: fields, so the real search is tiny; these only stop a pathological input from
-#: turning a combinatorial search loose. Exceeding either means "cannot localize",
-#: which falls back to blaming every field the failing rules reference.
+#: Ceiling on the fault-localization search. A rule pack references a handful of
+#: fields, so the real search is tiny; this only stops a pathological input from
+#: turning the scan loose. Exceeding it means "cannot localize", which falls back
+#: to blaming every field the failing rules reference.
+#:
+#: There is no longer a depth ceiling to go with it: explanations are accepted at
+#: size one only, because that is the only size the soundness argument in
+#: :func:`_localize_fault` covers. Searching sizes 2 and 3 inverted the verdict on
+#: a column-slipped 재무상태표.
 MAX_LOCALIZATION_CANDIDATES = 16
-MAX_LOCALIZATION_DEPTH = 3
 
 
 def value_number(value: ExtractedValue) -> float | None:
@@ -181,23 +184,42 @@ def _localize_fault(failing: list[set[str]], cleared: set[str]) -> set[str] | No
         therefore always among the sets returned. Blaming their union cannot drop
         it.
 
-    Two assumptions come with that, and both are documented as limits: several
-    fields wrong at once may admit an explanation smaller than the truth, and a
-    wrong value that happens to satisfy some other invariant is cleared by it.
-    Returning ``None`` (no candidates, or a search wider than the ceilings above)
-    means the caller keeps the old blame-everything behaviour.
+    Note what that argument rests on: *nothing else changed*. It establishes
+    soundness for **one** wrong field and for no other case, and localization used
+    to run anyway at explanation sizes 2 and 3, where it is not merely imprecise
+    but inverts the verdict. A 재무상태표 is printed 당기/전기 side by side, and a
+    column slip is the archetypal OCR failure on that form. Read 자산총계 and
+    부채와자본총계 from the prior-year column and:
+
+        assets = current + noncurrent      violated
+        liab_equity = liabilities + equity violated
+        assets == liab_equity              **passes** — both slipped values agree
+
+    The passing rule clears the two misread fields, so the smallest set that
+    explains both violations is one correct field from each side. The gate then
+    verified the two wrong totals at confidence 1.0 and discarded all four right
+    values — not a bypass but its inverse, certifying exactly the numbers a human
+    would have caught. Two consistently wrong values corroborating each other is
+    the failure mode this whole project exists to catch.
+
+    So an explanation is accepted only at size one. A minimum hitting set of two
+    or more *is* the signal that several fields are wrong at once, which is
+    precisely when exoneration is unsound; there is no reason to trust the
+    smaller story over the larger one. Returning ``None`` (no single-field
+    explanation, no candidates, or a search wider than the ceiling above) means
+    the caller keeps the blame-everything behaviour, costing precision rather
+    than recall.
+
+    One limit survives: a wrong value that satisfies some other invariant is
+    still cleared by it, so localization can be defeated by an error consistent
+    across every rule that touches it.
     """
     candidates = sorted(set().union(*failing) - cleared) if failing else []
     if not candidates or len(candidates) > MAX_LOCALIZATION_CANDIDATES:
         return None
-    for size in range(1, min(len(candidates), MAX_LOCALIZATION_DEPTH) + 1):
-        explanations = [
-            set(combo)
-            for combo in combinations(candidates, size)
-            if all(set(combo) & rule for rule in failing)
-        ]
-        if explanations:
-            return set().union(*explanations)
+    singles = [{c} for c in candidates if all({c} & rule for rule in failing)]
+    if singles:
+        return set().union(*singles)
     return None
 
 
@@ -307,7 +329,10 @@ def run_gate(
     """Verify every extracted value and return per-field verdicts."""
     # Grounding runs first: which values are grounded decides which rule results
     # are allowed to vouch for a field (see :func:`_vouching_check`).
-    groundings = [ground_value(v.raw, v.grounding_quote, full_text) for v in values]
+    # One budget for the whole request. Per-value caps bound a value; only this
+    # bounds what a caller carrying MAX_VALUES of them can ask the server to do.
+    budget = FuzzyBudget()
+    groundings = [ground_value(v.raw, v.grounding_quote, full_text, budget) for v in values]
     counts = Counter(v.field for v in values)
     grounded = {v.field for v, g in zip(values, groundings, strict=True) if g.passed}
     env = _build_env(values, counts)

@@ -165,3 +165,61 @@ def test_a_rule_downgraded_for_leaning_on_ungrounded_values_never_exonerates():
     assert fields["total"].grounded  # the figure really is on the page
     assert fields["total"].verdict is Verdict.DISCARDED
     assert not any(c.name == "fault_localization" for c in fields["total"].checks)
+
+
+# --- 4) exoneration is only sound for a single fault ---------------------------
+
+
+# 당기/전기 two-column 재무상태표 with the two 총계 rows read from the prior-year
+# column — the archetypal OCR failure on this form, and one no attacker is needed
+# to produce.
+COLUMN_SLIP_DOC = (
+    "재무상태표\n"
+    "과 목  당기  전기\n"
+    "유동자산 600,000,000 500,000,000\n"
+    "비유동자산 400,000,000 350,000,000\n"
+    "자산총계 1,000,000,000 850,000,000\n"
+    "부채총계 300,000,000 250,000,000\n"
+    "자본총계 700,000,000 600,000,000\n"
+    "부채와자본총계 1,000,000,000 850,000,000\n"
+)
+
+COLUMN_SLIP_VALUES = [
+    ("current_assets", "600,000,000"),
+    ("noncurrent_assets", "400,000,000"),
+    ("total_assets", "850,000,000"),  # slipped
+    ("total_liabilities", "300,000,000"),
+    ("total_equity", "700,000,000"),
+    ("total_liab_equity", "850,000,000"),  # slipped
+]
+
+
+def test_two_slipped_totals_are_not_certified_over_the_correct_values():
+    """The inversion this restriction exists to prevent.
+
+    Both slipped totals are 850,000,000, so `assets == liab_equity` *passes* and
+    clears them; the smallest set explaining the two violations that remain is
+    then one correct field from either side. The gate used to verify the two
+    misread totals at confidence 1.0 and discard all four correct values — not a
+    bypass but its inverse, certifying exactly the numbers a human would catch.
+    """
+    fields = {
+        f.field: f
+        for f in run_gate(
+            [ExtractedValue(name, raw, None, None) for name, raw in COLUMN_SLIP_VALUES],
+            COLUMN_SLIP_DOC,
+            load_pack("balance_sheet"),
+        )
+    }
+    for slipped in ("total_assets", "total_liab_equity"):
+        assert fields[slipped].verdict is Verdict.DISCARDED, f"{slipped} was certified"
+        assert fields[slipped].confidence == 0.0
+
+
+def test_localization_declines_when_no_single_field_explains_everything():
+    # Two disjoint violations need two culprits, and needing two *is* the signal
+    # that more than one value is wrong — exactly where exoneration stops being
+    # sound. Declining costs precision; guessing costs the guarantee.
+    assert _localize_fault([{"a", "b"}, {"c", "d"}], cleared=set()) is None
+    # ...while one field covering every violation is still localized.
+    assert _localize_fault([{"a", "b"}, {"a", "c"}], cleared=set()) == {"a"}

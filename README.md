@@ -37,6 +37,20 @@ key, no network, no randomness — the same input always produces the same verdi
 
 ## 30-second quick start
 
+> [!WARNING]
+> **PyPI is currently a release behind, and the version it serves has a gate bypass.**
+> `pip install groundextract` gives you 0.1.3, in which a misassigned amount comes back
+> `verified` at confidence 1.0 whenever the document spells it with a space or a dot as
+> the thousands separator, or in 한글/한자 수사 — ordinary OCR output for Korean forms.
+> Until the upload lands, install the fixed release directly:
+>
+> ```bash
+> pip install "groundextract @ git+https://github.com/sos37591-prog/groundextract-kr@v0.1.7"
+> ```
+>
+> See the [release notes](https://github.com/sos37591-prog/groundextract-kr/releases/latest)
+> for the full list and a mitigation if you are stuck on 0.1.3.
+
 ```bash
 python -m pip install groundextract   # Python 3.11+, exactly one runtime dep (PyYAML)
 python -m groundextract               # key-free demo, no network

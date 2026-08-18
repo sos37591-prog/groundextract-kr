@@ -29,13 +29,18 @@ closes it:
    it against.
 7. **Unbounded work.** The fuzzy tier walks the source for every value, so one
    well-formed request could occupy the (single-threaded) MCP server for
-   minutes, starving every other caller on the pipe. Two caps failed here before
-   the third worked: counting source *characters* missed that cost is not linear
-   in them, and the replacement — predicting cost as source tokens x value
-   tokens — turned out to be *anti-correlated* with the real thing, so the shape
-   that looked cheapest ran longest. The walk now spends a budget it decrements
-   as it goes, which measures the work instead of guessing it.
-   ``extract_verified`` separately enforced no document cap at all.
+   minutes, starving every other caller on the pipe. Three caps failed here
+   before the fourth worked, and each failure was the same mistake in a new
+   place: bounding something other than the work. Counting source *characters*
+   missed that cost is not linear in them. Predicting cost as source tokens x
+   value tokens tracked it far too weakly, leaving shapes that cost tens of
+   seconds inside a few percent of their allowance. Charging the real comparison
+   size but pricing only ``len(value) x len(span)`` billed a two-character value
+   two units a call, making *short* values the expensive family. And bounding
+   each value bounded nothing about a request carrying ``MAX_VALUES`` of them.
+   The walk now charges every comparison, including a per-call floor, against
+   both a per-value and a per-request budget. ``extract_verified`` separately
+   enforced no document cap at all.
 8. **Fragments as evidence.** A textual value grounded against any slice of the
    page, so a truncated 상호 or identifier counted as verbatim.
 9. **Spelling deciding the checks.** The gate asked ``normalize_number_str``
@@ -337,53 +342,81 @@ def test_worst_case_request_stays_fast():
     assert time.perf_counter() - started < 5.0
 
 
-# Source shapes that sit *inside* every declared cap and still make the span walk
-# as expensive as it can be: a long value that never matches, against a source
-# tokenized finely enough to produce tens of thousands of spans. The first
-# attempt at a guard predicted cost as source_tokens x value_tokens, which is
-# anti-correlated with the real thing — the cheapest-looking of these shapes
-# (`1`, one value token) was the most expensive to run, at ~41s for a single
-# value. Parametrized because the guard has to hold across the whole family, not
-# at the one point a test happens to pick.
-@pytest.mark.parametrize("source_token_chars", [1, 2, 8, 16, 64, 128])
-def test_the_span_walk_is_bounded_whatever_the_token_shape(source_token_chars):
-    token = "가" * source_token_chars
-    source = " ".join([token] * (MAX_FUZZY_SOURCE_CHARS // (source_token_chars + 1)))
-    source = source[:MAX_FUZZY_SOURCE_CHARS]
-    value = ("나" * MAX_VALUE_CHARS)[:MAX_VALUE_CHARS]
+def _hostile_source(token_chars: int) -> str:
+    token = "가" * token_chars
+    source = " ".join([token] * (MAX_FUZZY_SOURCE_CHARS // (token_chars + 1)))
+    return source[:MAX_FUZZY_SOURCE_CHARS]
+
+
+def _never_matching_value(length: int, tokens: int) -> str:
+    piece = "나" * max(length // tokens, 1)
+    return (" ".join([piece] * tokens))[:length]
+
+
+# Shapes that sit *inside* every declared cap and still make the span walk as
+# expensive as it can be. Both earlier versions of this test pinned a single
+# point — a 1024-character, single-token value — and both times the guard they
+# were protecting was broken somewhere else in the family: that value is the
+# *cheapest* point once cost is charged per comparison, because one long string
+# drains the budget in a few hundred calls. The expensive shapes are short values
+# against a finely tokenized source, which buy tens of thousands of calls.
+#
+# So sweep the value axis too. A test that samples one shape and calls it the
+# worst is how this defence got shipped broken twice.
+@pytest.mark.parametrize("source_token_chars", [1, 2, 4, 16, 64])
+@pytest.mark.parametrize(("value_chars", "value_tokens"), [(2, 1), (16, 16), (64, 4), (1024, 1)])
+def test_the_span_walk_is_bounded_whatever_the_shape(
+    source_token_chars, value_chars, value_tokens
+):
+    source = _hostile_source(source_token_chars)
+    value = _never_matching_value(value_chars, value_tokens)
 
     started = time.perf_counter()
     kind, _ = match_value(value, source)
     elapsed = time.perf_counter() - started
 
     assert kind is MatchKind.NONE  # fail-closed: never a false verify
-    # Budget: MAX_VALUES of these must stay inside a few seconds of wall clock,
-    # because the MCP stdio loop answers one caller at a time.
-    assert elapsed < 5.0 / MAX_VALUES * 16, f"{elapsed:.3f}s for one value"
+    assert elapsed < 2.0, f"{elapsed:.3f}s for one value"
 
 
-def test_no_shape_buys_more_work_than_an_honest_large_document():
-    # The property that actually matters: an attacker must not be able to make
-    # the walk cost *more* than a legitimate request already does. If the worst
-    # crafted shape lands near an ordinary miss on a full-size document, there is
-    # no amplification left to exploit — and tightening further would start
-    # costing real documents their grounding.
+def test_a_full_request_is_bounded_not_just_each_value_in_it():
+    """The bound that actually protects the server.
+
+    Per-value budgets bound a value. A caller sends `MAX_VALUES` of them, so
+    bounding each in isolation bounded nothing about the request — every value
+    sat inside its own allowance and the total still ran into minutes on a loop
+    that answers one caller at a time. `run_gate` now opens one `FuzzyBudget` and
+    every value spends from it.
+    """
+    source = _hostile_source(1)
+    values = [
+        ExtractedValue(f"f{i}", _never_matching_value(16, 16) + "다" * (i % 3), None, None)
+        for i in range(MAX_VALUES)
+    ]
+
+    started = time.perf_counter()
+    fields = run_gate(values, source, load_rule_pack(RULES))
+    elapsed = time.perf_counter() - started
+
+    assert len(fields) == MAX_VALUES
+    assert all(f.verdict is Verdict.DISCARDED for f in fields)
+    assert elapsed < 10.0, f"{elapsed:.2f}s for a full {MAX_VALUES}-value request"
+
+
+def test_an_honest_request_is_nowhere_near_the_request_budget():
+    # The counterweight: the shared budget must not starve ordinary work. A real
+    # document with a real 상호 has to ground on the first value and cost nothing
+    # worth measuring.
     line = "전자세금계산서 공급자 주식회사 가온소프트 공급받는자 주식회사 나래상사 "
-    # Fill the cap: comparing against a 2 KiB "large document" would compare the
-    # crafted input to nothing in particular.
     honest = (line * (MAX_FUZZY_SOURCE_CHARS // len(line) + 1))[:MAX_FUZZY_SOURCE_CHARS]
     started = time.perf_counter()
-    match_value("주식회사 없는상사", honest)
-    honest_cost = time.perf_counter() - started
-
-    hostile_source = (" ".join(["가"] * (MAX_FUZZY_SOURCE_CHARS // 2)))[:MAX_FUZZY_SOURCE_CHARS]
-    started = time.perf_counter()
-    match_value(("나" * MAX_VALUE_CHARS), hostile_source)
-    hostile_cost = time.perf_counter() - started
-
-    assert hostile_cost < honest_cost * 8, (
-        f"crafted input costs {hostile_cost:.3f}s vs {honest_cost:.3f}s for an honest miss"
+    fields = run_gate(
+        [ExtractedValue("supplier_name", "주식회사 가온소프트", None, None)],
+        honest,
+        load_rule_pack(RULES),
     )
+    assert fields[0].verdict is Verdict.VERIFIED
+    assert time.perf_counter() - started < 1.0
 
 
 def test_a_realistic_document_still_grounds_after_the_budget():

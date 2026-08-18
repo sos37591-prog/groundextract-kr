@@ -71,15 +71,15 @@ MAX_FUZZY_SOURCE_CHARS = 64 * 1024
 
 # ...and a hard budget on the work itself, because a size limit does not bound it.
 #
-# This is the second attempt. The first predicted the cost as source_tokens x
-# value_tokens and rejected the search when the product was too large. That
-# metric turned out to be *anti-correlated* with the real cost: holding a value
-# at 1024 characters and varying only how many spaces it contains, a 1-token
-# value consumed 0.096% of the budget and ran 4.0s, while a 64-token value
-# consumed 6.2% — 64x more budget — and ran 2.5s. So the shape that looked
-# cheapest to the guard was the most expensive to execute, and a single
-# well-formed request could still occupy the server for tens of minutes while
-# every declared limit was respected.
+# Two earlier attempts failed, and how they failed is why this one is shaped the
+# way it is.
+#
+# The first predicted the cost as source_tokens x value_tokens and declined when
+# the product was too large. Re-measured, budget consumption and wall clock do
+# move together, but far too weakly — across the shapes swept, a 114x spread in
+# budget bought a 6.7x spread in time — so the limit sat far looser than its
+# slowest observed input, and shapes costing tens of seconds passed while
+# spending a few percent of their allowance.
 #
 # The lesson is that SequenceMatcher's cost is data-dependent (autojunk alone
 # swings it by an order of magnitude) and not worth predicting. So this budget is
@@ -89,16 +89,36 @@ MAX_FUZZY_SOURCE_CHARS = 64 * 1024
 # walk order is fixed so the cut-off point is deterministic — the same request
 # always gets the same answer.
 #
+# The second attempt got that right and still mispriced, by charging
+# len(value) x len(span) alone. Every comparison also pays a cost that depends on
+# neither string — constructing the SequenceMatcher, slicing and joining the
+# span, one iteration of the loop — so a *short* value was billed 2 units per
+# call and fitted tens of thousands of calls inside the budget. Short values, not
+# long ones, turned out to be the expensive family. Hence
+# FUZZY_CALL_OVERHEAD_CHARS below, which prices that floor.
+#
 # Stopping early returns whatever the walk had found, so a match already located
 # still counts and a value that had not matched yet comes back ungrounded. That
 # is the fail-closed direction: the cost is a discarded field the caller can
 # rescue by citing a grounding_quote, never a false verification.
-#
-# The size: one comparison of an 11-character 상호 against a span costs ~11 x
-# span. A few-KiB Korean invoice — the documents this gate targets — walks in
-# well under 200k, so genuine work is an order of magnitude inside the budget,
-# while the worst shape measured above is cut off in milliseconds.
 MAX_FUZZY_COMPARISON_CHARS = 1_000_000
+
+#: What one comparison costs before either string is looked at. Charging only
+#: len(value) x len(span) prices a 2-character value at 2 units per call, which
+#: is how short values became the worst family rather than the cheapest; this
+#: floor dominates exactly when both strings are small, which is the case where
+#: it really is the whole cost.
+FUZZY_CALL_OVERHEAD_CHARS = 96
+
+#: ...and a budget for the whole request, because the one above is per *value*
+#: and a caller may send MAX_VALUES of them. Bounding each value in isolation
+#: bounds nothing about the request: 256 values, each legitimately inside its own
+#: allowance, still add up to minutes of CPU on a loop that answers one caller at
+#: a time. :func:`groundextract.gate.run_gate` opens one of these and every value
+#: spends from it, so what a request can ask for is bounded once rather than per
+#: field. Values arriving after it is exhausted skip the fuzzy tier and come back
+#: ungrounded — the same fail-closed direction as the per-value cut-off.
+MAX_FUZZY_REQUEST_CHARS = 4_000_000
 
 # Characters that are noise around numbers in KR financial docs.
 _CURRENCY_UNITS = ("원", "₩", "KRW", "krw")
@@ -280,7 +300,30 @@ def _fuzzy_ratio(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
-def _best_fuzzy_ratio(v_norm: str, s_norm: str) -> float:
+class FuzzyBudget:
+    """Fuzzy-matching work one request may spend, shared across its values.
+
+    :data:`MAX_FUZZY_COMPARISON_CHARS` bounds a single value's span walk, which
+    bounds nothing about a request carrying ``MAX_VALUES`` of them — each one
+    comfortably inside its own allowance still summed to minutes of CPU on a loop
+    that answers one caller at a time. :func:`groundextract.gate.run_gate` opens
+    one budget and hands it to every value, so the request is bounded once.
+
+    Callers that ground a value on its own get a fresh budget and are unaffected.
+    """
+
+    __slots__ = ("remaining",)
+
+    def __init__(self, total: int = MAX_FUZZY_REQUEST_CHARS) -> None:
+        self.remaining = total
+
+    def spend(self, cost: int) -> bool:
+        """Charge ``cost``; ``False`` once the request has run out."""
+        self.remaining -= cost
+        return self.remaining >= 0
+
+
+def _best_fuzzy_ratio(v_norm: str, s_norm: str, budget: FuzzyBudget | None = None) -> float:
     """Best ratio of the value against token-aligned spans of the source.
 
     The candidates a fuzzy comparison is scored against decide what the tier
@@ -303,18 +346,20 @@ def _best_fuzzy_ratio(v_norm: str, s_norm: str) -> float:
     best = 0.0
     # Spent as the walk proceeds rather than estimated in advance — see
     # MAX_FUZZY_COMPARISON_CHARS for why predicting this cost does not work.
-    budget = MAX_FUZZY_COMPARISON_CHARS
+    # `mine` bounds this value; `budget` bounds the request it belongs to.
+    mine = MAX_FUZZY_COMPARISON_CHARS
     for width in sorted({max(wanted - 1, 1), wanted, wanted + 1}):
         for i in range(0, max(len(tokens) - width + 1, 1)):
             span = " ".join(tokens[i : i + width])
-            # len(value) x len(span) is SequenceMatcher's worst case. The +1 is
-            # not rounding: every call also pays a fixed cost proportional to the
-            # value alone (indexing it, walking it for matching blocks), which a
-            # bare product prices at nothing when the span is a character or two
-            # — precisely the shape a long value against a finely tokenized
-            # source produces, and the slowest one measured.
-            budget -= len(v_norm) * (len(span) + 1)
-            if budget < 0:
+            # len(value) x len(span) is SequenceMatcher's worst case, plus the
+            # per-call floor that depends on neither string. Without the floor a
+            # two-character value costs two units and tens of thousands of calls
+            # fit inside the budget, which made short values the expensive family.
+            cost = len(v_norm) * len(span) + FUZZY_CALL_OVERHEAD_CHARS
+            mine -= cost
+            if mine < 0:
+                return best
+            if budget is not None and not budget.spend(cost):
                 return best
             best = max(best, _fuzzy_ratio(v_norm, span))
             if best >= FUZZY_THRESHOLD:
@@ -347,7 +392,9 @@ def _occurs_standalone(needle: str, haystack: str) -> bool:
     return False
 
 
-def match_value(value: str, source: str) -> tuple[MatchKind, str]:
+def match_value(
+    value: str, source: str, budget: FuzzyBudget | None = None
+) -> tuple[MatchKind, str]:
     """Return (kind, detail) describing how ``value`` grounds in ``source``.
 
     ``value``  : the string the model claims (e.g. "1,000,000").
@@ -420,14 +467,19 @@ def match_value(value: str, source: str) -> tuple[MatchKind, str]:
             f"({len(s_norm)} chars > {MAX_FUZZY_SOURCE_CHARS}); "
             "cite a grounding_quote to ground a textual value in a document this size",
         )
-    best = _best_fuzzy_ratio(v_norm, s_norm)
+    best = _best_fuzzy_ratio(v_norm, s_norm, budget)
     if best >= FUZZY_THRESHOLD:
         return MatchKind.FUZZY, f"fuzzy match ratio={best:.2f} (>= {FUZZY_THRESHOLD})"
 
     return MatchKind.NONE, f"no grounding (best fuzzy ratio={best:.2f})"
 
 
-def ground_value(value: str, grounding_quote: str | None, full_text: str) -> Check:
+def ground_value(
+    value: str,
+    grounding_quote: str | None,
+    full_text: str,
+    budget: FuzzyBudget | None = None,
+) -> Check:
     """Produce a grounding ``Check`` for one extracted value.
 
     When the model cites a ``grounding_quote``, **three** conditions must hold:
@@ -458,10 +510,10 @@ def ground_value(value: str, grounding_quote: str | None, full_text: str) -> Che
                 kind=MatchKind.NONE,
             )
         # (2) the value must live inside the span the model pointed at.
-        kind, detail = match_value(value, grounding_quote)
+        kind, detail = match_value(value, grounding_quote, budget)
         # (3) and it must survive on its own against the whole document.
         if kind is not MatchKind.NONE:
-            doc_kind, doc_detail = match_value(value, full_text)
+            doc_kind, doc_detail = match_value(value, full_text, budget)
             if doc_kind is MatchKind.NONE:
                 return Check(
                     name="grounding",
@@ -470,7 +522,7 @@ def ground_value(value: str, grounding_quote: str | None, full_text: str) -> Che
                     kind=MatchKind.NONE,
                 )
     else:
-        kind, detail = match_value(value, full_text)
+        kind, detail = match_value(value, full_text, budget)
 
     passed = kind is not MatchKind.NONE
     return Check(name="grounding", passed=passed, detail=detail, kind=kind)

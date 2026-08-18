@@ -1,5 +1,23 @@
 # Security Policy
 
+## Known-vulnerable release on PyPI
+
+> **0.1.3 is what `pip install groundextract` currently gives you, and it has a gate
+> bypass.** A misassigned amount comes back `verified` at confidence 1.0 whenever the
+> document spells it with a space or a dot as the thousands separator, or in 한글/한자
+> 수사 — ordinary OCR output for Korean forms. It also has an unbounded fuzzy-matching
+> path that lets one well-formed MCP request occupy the server for minutes.
+>
+> Install the fixed release until the upload lands:
+>
+> ```bash
+> pip install "groundextract @ git+https://github.com/sos37591-prog/groundextract-kr@v0.1.7"
+> ```
+>
+> **Mitigation if you must stay on 0.1.3:** treat as unverified any value whose `raw`
+> either holds digits that do not spell one number, or spells a quantity with no ASCII
+> digits at all, in a field your rule pack names. Those were never actually checked.
+
 ## Supported versions
 
 The project is pre-1.0. Only the latest release line receives fixes; there are no
@@ -7,8 +25,9 @@ backports to older tags.
 
 | Version | Supported |
 | --- | --- |
-| 0.1.x | ✅ |
-| < 0.1 | ❌ (pre-release, never published) |
+| 0.1.7 | ✅ |
+| 0.1.4 – 0.1.6 | ⚠️ superseded, each by a security fix in the next |
+| ≤ 0.1.3 | ❌ known gate bypass — see above |
 
 ## What counts as a security issue here
 
@@ -111,7 +130,9 @@ We do not operate a bug bounty.
 - `host` is **deployment configuration, not a tool argument**. A caller-supplied
   host would make the server a confused deputy — an agent could name any endpoint
   and have the server post your documents to it — so a request carrying `host` is
-  rejected with `-32602` rather than honoured. Protect `OLLAMA_HOST` on the machine
-  running the server; that is the actual control point.
+  rejected with `-32602` rather than honoured. **Both** tools reject it, including
+  the one that opens no socket: a client sending it believes it is choosing an
+  endpoint, and answering that belief with silence is worse than an error. Protect
+  `OLLAMA_HOST` on the machine running the server; that is the actual control point.
 - The runtime dependency surface is intentionally one package (PyYAML). CI generates
   a CycloneDX SBOM and fails on strong-copyleft licenses in the dependency tree.

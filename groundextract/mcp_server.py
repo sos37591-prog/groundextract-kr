@@ -291,8 +291,26 @@ def _gate_payload(values: list[ExtractedValue], full_text: str, doc_type: str) -
 # --- tools ----------------------------------------------------------------------
 
 
+def _reject_host(args: dict[str, Any]) -> None:
+    """Refuse a caller-supplied ``host`` on either tool.
+
+    ``extract_verified`` rejects it because honouring it would make the server a
+    confused deputy. This tool opens no socket at all, so the argument is merely
+    meaningless here — but *silently* meaningless is the wrong answer twice over.
+    A client that sends it believes it is choosing an endpoint, and SECURITY.md
+    tells readers a request carrying ``host`` is rejected, without qualifying
+    which tool. One of those had to give, and the safe one is to say no.
+    """
+    if "host" in args:
+        raise InvalidParamsError(
+            "'host' is not accepted: the Ollama endpoint is server configuration "
+            "(set OLLAMA_HOST on the server running groundextract.mcp_server)"
+        )
+
+
 def _tool_verify_extraction(args: dict[str, Any]) -> dict[str, Any]:
     """Deterministic gate over caller-supplied extracted values. No keys, no network."""
+    _reject_host(args)
     full_text = _require_bounded_str(args, "full_text", MAX_FULL_TEXT_CHARS)
     doc_type = _require_doc_type(args)
     values = _parse_values(args.get("values"))
@@ -310,11 +328,7 @@ def _extractor_kwargs(args: dict[str, Any]) -> dict[str, Any]:
     document under verification would aim for. Requests that still carry it are
     rejected loudly rather than silently ignored.
     """
-    if "host" in args:
-        raise InvalidParamsError(
-            "'host' is not accepted: the Ollama endpoint is server configuration "
-            "(set OLLAMA_HOST on the server running groundextract.mcp_server)"
-        )
+    _reject_host(args)
     kwargs: dict[str, Any] = {}
     model = args.get("model")
     if model is not None:

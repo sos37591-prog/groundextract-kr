@@ -32,6 +32,20 @@
 
 ## 30초 시작
 
+> [!WARNING]
+> **PyPI가 한 릴리스 뒤처져 있고, 거기 올라간 버전에는 게이트 우회가 있습니다.**
+> `pip install groundextract` 는 0.1.3 을 설치하는데, 문서가 금액을 공백·점 구분으로
+> 인쇄했거나 한글/한자 수사로 적었을 때 — 한국 서식 OCR에서 흔한 형태입니다 —
+> 오배정된 금액이 confidence 1.0 으로 `verified` 됩니다. 업로드 전까지는 수정본을
+> 직접 설치하십시오:
+>
+> ```bash
+> pip install "groundextract @ git+https://github.com/sos37591-prog/groundextract-kr@v0.1.7"
+> ```
+>
+> 전체 목록과 0.1.3 사용자용 완화 방법은
+> [릴리스 노트](https://github.com/sos37591-prog/groundextract-kr/releases/latest)에 있습니다.
+
 ```bash
 git clone https://github.com/sos37591-prog/groundextract-kr.git
 cd groundextract-kr

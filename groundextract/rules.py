@@ -351,10 +351,20 @@ def pack_fields(pack: RulePack) -> frozenset[str]:
 
     ``load_rule_pack`` is the guarded door, but ``RulePack`` is a plain dataclass
     a caller can build by hand, so a rule here may carry an expression that does
-    not parse. Such a rule is skipped rather than raised on: reading the pack
-    must not be the thing that crashes, and the field is discarded anyway by
-    :func:`evaluate_pack_with_fields`, which reports the malformed rule as a
-    failed check for everything it touches.
+    not parse. Such a rule is skipped rather than raised on: reading the pack must
+    not be the thing that crashes.
+
+    Skipping is not free, and the limit is worth stating plainly. The fields that
+    rule alone named are then missing from this set, so the gate does not know an
+    invariant was meant to cover them. A *numeric* value is still discarded —
+    :func:`evaluate_pack_with_fields` blames every field in the environment for a
+    malformed rule, and the gate's own fail-closed branch catches anything holding
+    digits. A value carrying no readable number in a field named only by the
+    broken rule is the gap: nothing claims it, so grounding alone decides it.
+
+    Loading from YAML cannot reach that state — the loader rejects an unparseable
+    expression outright — so it takes a hand-built pack with a rule the author
+    never validated.
     """
     fields: set[str] = set()
     for rule in pack.rules:

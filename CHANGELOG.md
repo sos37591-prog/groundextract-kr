@@ -11,6 +11,80 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-18
+
+### Security
+
+- **Fault localization certified the wrong numbers and discarded the right ones.**
+  Not a bypass — its inverse. A 재무상태표 prints 당기 and 전기 side by side, and a
+  column slip is the archetypal OCR failure on that form. Read 자산총계 and
+  부채와자본총계 from the prior-year column and two invariants break while a third,
+  `assets == liab_equity`, **passes** — because both slipped values agree with each
+  other. The passing rule cleared the two misread fields, so the smallest set
+  explaining the remaining violations was one correct field from either side:
+
+  ```
+  total_assets       850,000,000  ← misread   verified   1.0
+  total_liab_equity  850,000,000  ← misread   verified   1.0
+  current_assets     600,000,000               discarded 0.0
+  noncurrent_assets  400,000,000               discarded 0.0
+  total_liabilities  300,000,000               discarded 0.0
+  total_equity       700,000,000               discarded 0.0
+  ```
+
+  Downstream consumes `verified` and sends `discarded` to a human, so this is the
+  worst possible arrangement of six fields — and it needs no attacker, only a
+  two-column form read one column off.
+
+  The soundness argument for localization was always about **one** wrong field
+  ("nothing else changed, so that field is in every failing rule"), and it was
+  running at explanation sizes 2 and 3 where the argument does not hold. It now
+  accepts single-field explanations only; a minimum hitting set of two or more *is*
+  the signal that several values are wrong at once, which is exactly when exoneration
+  is unsound. Cost is precision, not recall — and the benchmark does not move at all
+  (TP=52 FP=38 FN=0 TN=298, precision 57.8%).
+
+- **The fuzzy budget bounded each value but not the request.** A caller may send
+  `MAX_VALUES` of them; every one sat inside its own allowance and the total still
+  ran to minutes on a loop that answers one caller at a time. `run_gate` now opens one
+  `FuzzyBudget` and every value spends from it.
+
+- **Short values were systematically under-billed.** The charge was
+  `len(value) × len(span)`, which prices a two-character value at two units per
+  comparison and fits tens of thousands of calls inside the budget — so short values,
+  not long ones, were the expensive family, and the 0.1.5 claim that no amplification
+  remained was measured on the wrong end of it. `FUZZY_CALL_OVERHEAD_CHARS` now prices
+  the per-call floor that depends on neither string.
+
+  Swept across 168 combinations of source-token width × value length × value tokens:
+  worst **0.22s** per value, and a full `MAX_VALUES` request **1.35s** (previously
+  minutes). An honest 64 KiB document with a real 상호 grounds in 0.002s.
+
+- **`verify_extraction` silently ignored a caller-supplied `host`** while
+  `extract_verified` rejected it, and SECURITY.md described the rejection without
+  saying which tool. Both reject it now: a client sending it believes it is choosing
+  an endpoint, and answering that belief with silence is worse than an error.
+
+### Changed
+
+- Regression tests for the span walk sweep the value axis as well as the source axis,
+  and pin the request-level bound. Both previous versions of that test sampled a
+  single 1024-character value — the *cheapest* point in the family — which is how this
+  defence shipped broken twice.
+
+- README, README.ko and SECURITY.md now carry the warning that PyPI still serves
+  0.1.3, which has the gate bypass, with the mitigation for anyone stuck on it. The
+  warning had only been in the release notes, which is not where people look before
+  typing `pip install`.
+
+### Known limitation
+
+- The benchmark injects **at most one error per document** by construction
+  (`bench/generate_golden.py`), so "Auto-Discard Recall 100.0%" is a statement about
+  single-error documents and cannot speak to the multi-error case at all — the case
+  the fault-localization bug above lived in. Read the headline recall accordingly.
+  Multi-error golden documents are v0.2 work.
+
 ## [0.1.6] - 2026-08-18
 
 ### Security
@@ -57,12 +131,13 @@ Benchmark numbers are part of the public contract: any release that changes
   | 8 / 4 | 2.083% | 17.40s |
   | 16 / 8 | 2.573% | **17.47s** |
 
-  The worst shape the guard let through cost 17.5 seconds for a *single* value while
-  spending 2.6% of its budget — so the limit permitted roughly forty times the work
-  its slowest observed input actually did, and a well-formed request respecting every
-  declared cap still occupied the single-threaded MCP server for **~74 minutes** at
-  `MAX_VALUES`. (Sharper shapes were reported against other hardware; the numbers here
-  are the ones reproducible on the machine this was fixed on.) The 0.1.4 regression
+  Of the shapes swept above, the slowest the guard let through cost 17.5 seconds for a
+  *single* value while spending 2.6% of its budget — the limit permitted far more work
+  than its slowest observed input actually did, and a well-formed request respecting
+  every declared cap ran into tens of minutes at `MAX_VALUES`. A later sweep over a
+  wider grid found worse shapes still (63s for one value), so read these as "the worst
+  of what was measured", not as the maximum: establishing that would need the whole
+  input space, and the point is that the guard did not bound it. The 0.1.4 regression
   test passed because it pinned the one shape the guard did catch.
 
   `SequenceMatcher`'s cost is data-dependent — autojunk alone swings it by an order of
@@ -73,12 +148,10 @@ Benchmark numbers are part of the public contract: any release that changes
   fail-closed direction — a discarded field the caller can rescue with a
   `grounding_quote`, never a false verification.
 
-  Worst crafted shape now measures **0.13s** per value, down from 17.5s — and lands
-  *below* what an honest miss on a full-size 64 KiB document costs (0.14s), so there
-  is no amplification left to buy and tightening further would start costing real
-  documents their grounding. Tests parametrize the whole family of source shapes
-  rather than one point, and pin the no-amplification property directly. Benchmark
-  unchanged.
+  The crafted shapes measured here drop to ~0.13s per value from 17.5s. That was
+  reported as "no amplification left to buy"; it was not — the sweep behind it varied
+  the source and held the value long, and short values turned out to be the expensive
+  family. See 0.1.7. Benchmark unchanged.
 
 ## [0.1.4] - 2026-08-18
 
@@ -112,8 +185,8 @@ attached to the GitHub release.
   because its source has no spaces, which collapses the search to one candidate.
   `MAX_FUZZY_SEARCH_TOKENS` budgets `source_tokens × value_tokens`.
 
-  **This did not work** — that product turned out to be anti-correlated with the real
-  cost, leaving the same request shape open. Fixed properly in 0.1.5; see above.
+  **This did not work** — that product tracks the real cost far too weakly, leaving
+  the same request shape open. Fixed in 0.1.5, and again in 0.1.7; see above.
 
 - **`extract_verified` enforced no document cap**, so everything `MAX_LINE_CHARS`
   allowed (4 MiB) went into the prompt, over the wire, and back through the gate —
@@ -520,7 +593,8 @@ table-cell bounding boxes; no unit scaling for 천원/백만원 statements;
 `balance_sheet` not yet represented in the benchmark. See
 [README.md](README.md#limitations).
 
-[Unreleased]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.3...v0.1.4
