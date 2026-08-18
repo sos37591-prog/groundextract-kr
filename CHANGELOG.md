@@ -45,14 +45,25 @@ Benchmark numbers are part of the public contract: any release that changes
 
 - **The work budget added in 0.1.4 did not bound the work.** It predicted the span
   walk's cost as `source_tokens × value_tokens` and declined when the product was too
-  large. That metric is *anti-correlated* with the real cost: holding a value at 1024
-  characters and varying only how many spaces it contains, a 1-token value consumed
-  **0.096%** of the budget and ran **4.0s**, while a 64-token value consumed 6.2% —
-  64× more budget — and ran 2.5s. The shape that looked cheapest to the guard was the
-  most expensive to execute, so a single well-formed request still occupied the
-  single-threaded MCP server for tens of minutes (worst measured: 41s for one value,
-  ~175 minutes at `MAX_VALUES`) with every declared limit respected. The 0.1.4
-  regression test passed because it pinned the one shape the guard did catch.
+  large. That product does not track what the walk costs, and it under-charges by the
+  most exactly where it matters. Measured on the 0.1.4 code with a 1024-character
+  value against a 64 KiB source, varying only the tokenization:
+
+  | source / value tokens | budget consumed | wall clock |
+  | --- | --- | --- |
+  | 64 / 1 | 0.096% | 0.55s |
+  | 32 / 2 | 0.189% | 0.65s |
+  | 8 / 1 | 0.694% | 5.78s |
+  | 8 / 4 | 2.083% | 17.40s |
+  | 16 / 8 | 2.573% | **17.47s** |
+
+  The worst shape the guard let through cost 17.5 seconds for a *single* value while
+  spending 2.6% of its budget — so the limit permitted roughly forty times the work
+  its slowest observed input actually did, and a well-formed request respecting every
+  declared cap still occupied the single-threaded MCP server for **~74 minutes** at
+  `MAX_VALUES`. (Sharper shapes were reported against other hardware; the numbers here
+  are the ones reproducible on the machine this was fixed on.) The 0.1.4 regression
+  test passed because it pinned the one shape the guard did catch.
 
   `SequenceMatcher`'s cost is data-dependent — autojunk alone swings it by an order of
   magnitude — and is not worth predicting. So `MAX_FUZZY_COMPARISON_CHARS` is not a
@@ -62,11 +73,12 @@ Benchmark numbers are part of the public contract: any release that changes
   fail-closed direction — a discarded field the caller can rescue with a
   `grounding_quote`, never a false verification.
 
-  Worst crafted shape now measures **0.13s** per value (down from 41s, ~315× at
-  `MAX_VALUES`) and lands *below* what an honest miss on a full-size 64 KiB document
-  costs (0.14s) — there is no amplification left to buy. Tests parametrize the whole
-  family of source shapes rather than one point, and pin the no-amplification property
-  directly. Benchmark unchanged.
+  Worst crafted shape now measures **0.13s** per value, down from 17.5s — and lands
+  *below* what an honest miss on a full-size 64 KiB document costs (0.14s), so there
+  is no amplification left to buy and tightening further would start costing real
+  documents their grounding. Tests parametrize the whole family of source shapes
+  rather than one point, and pin the no-amplification property directly. Benchmark
+  unchanged.
 
 ## [0.1.4] - 2026-08-18
 
