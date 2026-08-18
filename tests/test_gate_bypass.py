@@ -43,7 +43,11 @@ closes it:
    a string holding several tokens. So "1 000 000원" — an ordinary OCR spelling
    of a Korean invoice figure — was filed as text, the arithmetic requirement
    fell away, and a misassignment that is caught when spelled "1,000,000원" came
-   back verified at confidence 1.0.
+   back verified at confidence 1.0. Widening the predicate to "holds digits"
+   closed that, and left the same hole for quantities written without digits at
+   all — 한글/한자 수사, Roman numerals, superscripts. What the gate promises
+   about a field its rule pack *names* cannot depend on notation, so a named
+   field with no readable number now fails closed however it is spelled.
 
 Interleaved throughout are the counterweights: a faithful extraction must still
 verify and legitimate formatting must still ground, or these fixes would have
@@ -591,6 +595,51 @@ def test_a_faithful_extraction_still_verifies():
         ]
     )
     assert all(f.verdict is Verdict.VERIFIED for f in fields.values())
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["일백만원", "삼천오백만원", "壹百萬", "百萬", "Ⅻ", "¹⁰⁰", "₁₀₀", "①", "½"],
+    ids=["hangul", "hangul-long", "hanja", "hanja-short", "roman",
+         "superscript", "subscript", "circled", "fraction"],
+)
+def test_a_quantity_written_without_digits_cannot_slip_into_a_field_a_rule_names(raw):
+    # `carries_number` asks whether the value holds a number *token*, and a token
+    # is ASCII digits after NFKC. That is not the only way to write a quantity:
+    # 한글/한자 수사 carry no digit at all, and superscripts, fractions and Roman
+    # numerals are category No/Nl — stripped as notation before the matcher sees
+    # them (rightly: ①②③ number line items, they are not amounts).
+    #
+    # Read as "text", such a value inherited a 상호's treatment — grounded
+    # verbatim, nothing else asked — so the supply amount spelled 일백만원 and
+    # dropped into the VAT slot came back verified at confidence 1.0. What the
+    # gate promises about a field its rule pack *names* must not depend on the
+    # notation the document used, so a named field with no readable number fails
+    # closed regardless of spelling.
+    doc = f"전자세금계산서\n공급가액 {raw}\n세액 100,000원\n합계금액 1,100,000원\n"
+    fields = run_gate(
+        [ExtractedValue("vat", raw, None, f"공급가액 {raw}")],
+        doc,
+        load_rule_pack(RULES),
+    )
+    assert fields[0].verdict is Verdict.DISCARDED
+    assert fields[0].confidence == 0.0
+    assert any(c.name == "rules_applied" and not c.passed for c in fields[0].checks)
+
+
+def test_the_same_value_is_still_text_where_no_rule_claims_it():
+    # The counterweight, and the line the fix has to hold: "a rule names this
+    # field" is the trigger, not "this string looks like it might be a number".
+    # A field no invariant covers is decided by grounding alone, as 상호 and
+    # 품목 always were — otherwise every unmodelled field becomes undiscardable
+    # noise and the gate stops being usable for anything but amounts.
+    doc = "전자세금계산서\n비고 일백만원\n공급가액 1,000,000원\n"
+    fields = run_gate(
+        [ExtractedValue("memo", "일백만원", None, "비고 일백만원")],
+        doc,
+        load_rule_pack(RULES),
+    )
+    assert fields[0].verdict is Verdict.VERIFIED
 
 
 def test_a_textual_value_still_needs_no_arithmetic():

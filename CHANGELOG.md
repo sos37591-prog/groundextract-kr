@@ -11,6 +11,34 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-18
+
+### Security
+
+- **A quantity written without digits still slipped into a field a rule names.**
+  0.1.4 widened the "does this owe arithmetic?" predicate from "is this one number?"
+  to "does this hold a number token", where a token is ASCII digits after NFKC. That
+  is not the only way to write a quantity. 한글 and 한자 수사 — `일백만원`, `壹百萬` —
+  carry no digit at all, and superscripts, fractions and Roman numerals are Unicode
+  category `No`/`Nl`, which `_drop_enclosed_numerals` strips as notation before the
+  matcher ever sees them. It strips them for a good reason: ①②③ number line items on
+  Korean forms and are not amounts.
+
+  Read as "text", such a value inherited a 상호's treatment — grounded verbatim,
+  nothing else asked. So the supply amount spelled `일백만원`, dropped into the VAT
+  slot, came back `verified` at confidence 1.0, the same failure the 0.1.4 fix closed
+  for space-separated thousands.
+
+  The predicate is no longer only about the value. A field the rule pack **names** is
+  a field an invariant was supposed to decide; reaching the end of the gate with no
+  arithmetic having run means it was not decided, whatever the value looks like. Such
+  a field now fails closed. Fields no rule covers are still decided by grounding
+  alone — otherwise every unmodelled field would become undiscardable noise — so 상호,
+  품목 and free-text memos behave exactly as before.
+
+  Nine notations are pinned as regression tests, along with the counterweight that the
+  same string stays text where no rule claims it. Benchmark unchanged.
+
 ## [0.1.5] - 2026-08-18
 
 ### Security
@@ -480,7 +508,8 @@ table-cell bounding boxes; no unit scaling for 천원/백만원 statements;
 `balance_sheet` not yet represented in the benchmark. See
 [README.md](README.md#limitations).
 
-[Unreleased]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.2...v0.1.3

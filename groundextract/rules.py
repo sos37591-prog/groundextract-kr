@@ -341,6 +341,30 @@ def evaluate_pack(pack: RulePack, env: dict[str, float]) -> list[Check]:
     return [check for check, _fields in evaluate_pack_with_fields(pack, env)]
 
 
+def pack_fields(pack: RulePack) -> frozenset[str]:
+    """Every field name the pack's rules mention.
+
+    The gate needs this to tell "no invariant covers this field" apart from "an
+    invariant covers it but could not run". The first is a documented gap; the
+    second is a value that was supposed to be checked and was not, which has to
+    fail closed however the value happens to be spelled.
+
+    ``load_rule_pack`` is the guarded door, but ``RulePack`` is a plain dataclass
+    a caller can build by hand, so a rule here may carry an expression that does
+    not parse. Such a rule is skipped rather than raised on: reading the pack
+    must not be the thing that crashes, and the field is discarded anyway by
+    :func:`evaluate_pack_with_fields`, which reports the malformed rule as a
+    failed check for everything it touches.
+    """
+    fields: set[str] = set()
+    for rule in pack.rules:
+        try:
+            fields |= _referenced_fields(rule)
+        except (SyntaxError, ValueError, TypeError):
+            continue
+    return frozenset(fields)
+
+
 def _referenced_fields(rule: Rule) -> set[str]:
     fields: set[str] = set()
     for side in (rule.lhs, rule.rhs):

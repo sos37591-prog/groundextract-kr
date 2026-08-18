@@ -65,7 +65,7 @@ from typing import Any
 
 from .grounding import carries_number, ground_value, normalize_number_str
 from .models import Check, ExtractedValue, Verdict, VerifiedField
-from .rules import RulePack, evaluate_pack_with_fields
+from .rules import RulePack, evaluate_pack_with_fields, pack_fields
 
 #: Check names the gate itself produces (rule packs supply all other names).
 GROUNDING_CHECK = "grounding"
@@ -329,6 +329,10 @@ def run_gate(
     #
     # So localization runs over violations only, and a downgraded rule keeps
     # failing for every field it references.
+    # Field names the pack mentions at all — not the ones whose rules happened to
+    # evaluate. See the fail-closed branch below.
+    covered = pack_fields(rule_pack) if rule_pack is not None else frozenset()
+
     vouched: list[tuple[Check, set[str], bool]] = []
     for check, fields in rule_checks:
         voucher = _vouching_check(check, fields, grounded)
@@ -363,9 +367,22 @@ def run_gate(
             for check, fields, downgraded in vouched
             if v.field in fields
         ]
-        if not arithmetic and value_carries_number(v):
+        if not arithmetic and (value_carries_number(v) or v.field in covered):
             # FAIL-CLOSED: a number nothing checked is unverified, not "fine".
             # This is also what keeps the all() below from passing vacuously.
+            #
+            # ``v.field in covered`` is the second half of that, and it does not
+            # ask what the value looks like. A rule names this field, so an
+            # invariant was supposed to decide it; arriving here means none ran.
+            # Digits are the usual reason a value gets checked, but they are not
+            # the only way to write a quantity — 한글/한자 수사 ("일백만원",
+            # "壹百萬"), Roman numerals and superscripts carry no ASCII digit and
+            # some are stripped as notation before the matcher ever sees them.
+            # Read as "text", such a value inherited a 상호's rules: grounded
+            # verbatim, nothing else asked. Put the supply amount in the VAT slot
+            # spelled 일백만원 and it verified at confidence 1.0. What the gate
+            # promises about a field it named cannot depend on the notation the
+            # document happened to use.
             arithmetic.append(_unverified_check(v, rule_pack))
 
         passed = grounding.passed and all(c.passed for c in (*integrity, *arithmetic))
