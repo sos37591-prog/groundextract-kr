@@ -29,7 +29,18 @@ closes it:
    it against.
 7. **Unbounded work.** The fuzzy tier walks the source for every value, so one
    well-formed request could occupy the (single-threaded) MCP server for
-   minutes, starving every other caller on the pipe.
+   minutes, starving every other caller on the pipe. The first cap counted
+   source *characters*, which is not what the search costs — a token-dense
+   source against a long value ran for hours while both inputs sat inside their
+   own limits, and ``extract_verified`` enforced no document cap at all.
+8. **Fragments as evidence.** A textual value grounded against any slice of the
+   page, so a truncated 상호 or identifier counted as verbatim.
+9. **Spelling deciding the checks.** The gate asked ``normalize_number_str``
+   whether a value was a number, and that returns ``None`` both for text and for
+   a string holding several tokens. So "1 000 000원" — an ordinary OCR spelling
+   of a Korean invoice figure — was filed as text, the arithmetic requirement
+   fell away, and a misassignment that is caught when spelled "1,000,000원" came
+   back verified at confidence 1.0.
 
 Interleaved throughout are the counterweights: a faithful extraction must still
 verify and legitimate formatting must still ground, or these fixes would have
@@ -52,13 +63,21 @@ from groundextract import (
     match_value,
     run_gate,
 )
-from groundextract.grounding import MAX_FUZZY_SOURCE_CHARS, normalize_number_str
+from groundextract.grounding import (
+    MAX_FUZZY_SEARCH_TOKENS,
+    MAX_FUZZY_SOURCE_CHARS,
+    _fuzzy_search_tokens,
+    normalize_number_str,
+)
 from groundextract.mcp_server import (
     MAX_FULL_TEXT_CHARS,
+    MAX_TIMEOUT_SECONDS,
     MAX_VALUE_CHARS,
     MAX_VALUES,
     InvalidParamsError,
+    _extractor_kwargs,
     _parse_values,
+    _tool_extract_verified,
     _tool_verify_extraction,
 )
 
@@ -312,6 +331,33 @@ def test_worst_case_request_stays_fast():
     assert time.perf_counter() - started < 5.0
 
 
+def test_a_token_dense_source_is_bounded_too():
+    # The test above walks a source with *no spaces*, which collapses the span
+    # search to a single candidate — so it passed while the search was still
+    # unbounded. The real worst case is a token-dense source against a long
+    # value: 32k spans, each as wide as the value. One such value cost ~34s
+    # measured, and MAX_VALUES of them put a single well-formed request over two
+    # hours, on a loop that answers one caller at a time.
+    source = ("가 " * (MAX_FUZZY_SOURCE_CHARS // 2))[:MAX_FUZZY_SOURCE_CHARS]
+    value = ("나 " * (MAX_VALUE_CHARS // 2))[:MAX_VALUE_CHARS]
+    started = time.perf_counter()
+    kind, detail = match_value(value, source)
+    elapsed = time.perf_counter() - started
+    assert kind is MatchKind.NONE
+    assert "fuzzy search too large" in detail
+    assert elapsed < 1.0
+
+
+def test_a_realistic_document_is_nowhere_near_the_search_budget():
+    # The counterweight: the budget must not be so tight that ordinary Korean
+    # documents start failing to ground. A page of spaced text with a 상호-sized
+    # value has to stay well inside it and still match.
+    source = "공급자 주식회사 가온소프트 서울특별시 강남구 " * 400
+    kind, _ = match_value("주식회사 가온소프트", source)
+    assert kind is MatchKind.EXACT
+    assert _fuzzy_search_tokens("주식회사 가온소프트", source) < MAX_FUZZY_SEARCH_TOKENS // 100
+
+
 def test_mcp_rejects_oversized_requests():
     for args, message in [
         ({"values": [{"field": "a", "raw": "1"}] * (MAX_VALUES + 1)}, "more than"),
@@ -326,15 +372,28 @@ def test_mcp_rejects_oversized_requests():
             _parse_values(args["values"])
 
 
-def test_mcp_rejects_an_oversized_document():
+@pytest.mark.parametrize("tool", [_tool_verify_extraction, _tool_extract_verified])
+def test_mcp_rejects_an_oversized_document(tool):
+    # Both tools, not just the cheap one. extract_verified took an unbounded
+    # string, so a 4 MiB document (MAX_LINE_CHARS) went into the prompt, over the
+    # wire, and back through the gate — strictly more work than the tool that
+    # *did* enforce the cap.
     with pytest.raises(InvalidParamsError, match="exceeds"):
-        _tool_verify_extraction(
+        tool(
             {
                 "full_text": "가" * (MAX_FULL_TEXT_CHARS + 1),
                 "doc_type": "tax_invoice",
                 "values": [],
             }
         )
+
+
+def test_mcp_rejects_an_unbounded_timeout():
+    # The stdio loop is sequential, so a caller-chosen timeout is how long one
+    # request may keep every other caller waiting.
+    with pytest.raises(InvalidParamsError, match="exceeds"):
+        _extractor_kwargs({"timeout": MAX_TIMEOUT_SECONDS + 1})
+    assert _extractor_kwargs({"timeout": 30})["timeout"] == 30.0
 
 
 # --- 8) a textual value must be a whole token, not any slice of the page ------
@@ -402,3 +461,113 @@ def test_a_fragment_supplier_name_is_discarded_by_the_gate():
     )
     assert fields[0].verdict is Verdict.DISCARDED
     assert fields[0].confidence == 0.0
+
+
+# --- 9) how a figure is spelled must not decide whether arithmetic runs --------
+
+# Space- and dot-separated thousands, as an OCR pass prints them. Every figure
+# below is genuinely on the page, so grounding has nothing to object to — the
+# only thing standing between a misassignment and a `verified` verdict is
+# whether the gate still demands an arithmetic rule.
+DOC_SPACED = (
+    "전자세금계산서\n"
+    "공급가액  1 000 000원\n"
+    "세액        100 000원\n"
+    "합계금액  1 100 000원\n"
+)
+
+DOC_DOTTED = (
+    "전자세금계산서\n"
+    "공급가액  1.000.000원\n"
+    "세액        100.000원\n"
+    "합계금액  1.100.000원\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("doc", "supply", "vat", "total"),
+    [
+        (DOC_SPACED, "1 000 000원", "1 000 000원", "1 100 000원"),
+        (DOC_DOTTED, "1.000.000원", "1.000.000원", "1.100.000원"),
+    ],
+    ids=["space-separated", "dot-separated"],
+)
+def test_a_misassignment_cannot_hide_behind_a_thousands_separator(doc, supply, vat, total):
+    # The supply figure put in the VAT slot. Spelled "1,000,000원" this is caught
+    # (10% of supply is not supply), and it must be caught here too. It was not:
+    # `normalize_number_str` returns None for a multi-token string, the gate read
+    # that None as "purely textual", and the arithmetic requirement fell away —
+    # three fields came back verified at confidence 1.0 having been checked by
+    # nothing at all.
+    fields = _fields(
+        [
+            ExtractedValue("supply", supply, None, f"공급가액  {supply}"),
+            ExtractedValue("vat", vat, None, f"공급가액  {supply}"),
+            ExtractedValue("total", total, None, f"합계금액  {total}"),
+        ],
+        doc=doc,
+    )
+    assert _all_discarded(fields)
+    assert all(
+        any(c.name == "rules_applied" and not c.passed for c in f.checks)
+        for f in fields.values()
+    )
+
+
+def test_the_same_misassignment_is_caught_however_it_is_spelled():
+    # The comma-spelled control for the case above. The two spellings are caught
+    # by different halves of the gate and the verdicts differ in *scope*, which
+    # is the honest thing to pin: here the numbers are readable, the 10% rule is
+    # violated, and localization narrows the fault to the field that caused it;
+    # in the multi-token spelling nothing can be read, so every figure fails
+    # closed. What must not differ is the bad value's verdict.
+    fields = _fields(
+        [
+            ExtractedValue("supply", "1,000,000원", None, "공급가액  1,000,000원"),
+            ExtractedValue("vat", "1,000,000원", None, "공급가액  1,000,000원"),
+            ExtractedValue("total", "1,100,000원", None, "합계금액  1,100,000원"),
+        ]
+    )
+    assert fields["vat:1,000,000원"].verdict is Verdict.DISCARDED
+    assert fields["vat:1,000,000원"].confidence == 0.0
+
+
+def test_dates_and_identifiers_no_rule_covers_are_discarded_not_verified():
+    # The module docstring promises a numeric-looking value no invariant covers
+    # comes back DISCARDED "because the gate never claims more than it actually
+    # checked". Multi-token identifiers used to be the exception that broke it.
+    doc = "전자세금계산서\n승인번호: 20260701-41000000-12345678\n작성일자: 2026-07-01\n"
+    fields = _fields(
+        [
+            ExtractedValue("approval_no", "20260701-41000000-12345678", None, None),
+            ExtractedValue("issue_date", "2026-07-01", None, None),
+        ],
+        doc=doc,
+    )
+    assert _all_discarded(fields)
+
+
+def test_a_faithful_extraction_still_verifies():
+    # The counterweight: nothing above may be bought by discarding good values.
+    fields = _fields(
+        [
+            ExtractedValue("supply", "1,000,000원", None, "공급가액  1,000,000원"),
+            ExtractedValue("vat", "100,000원", None, "세액        100,000원"),
+            ExtractedValue("total", "1,100,000원", None, "합계금액  1,100,000원"),
+        ]
+    )
+    assert all(f.verdict is Verdict.VERIFIED for f in fields.values())
+
+
+def test_a_textual_value_still_needs_no_arithmetic():
+    # ...and a value carrying no digits at all is still decided by grounding
+    # alone. Widening the predicate to "holds digits" must not widen it to
+    # "holds anything".
+    doc = "상호 주식회사 가온소프트\n공급가액 1,000,000원\n세액 100,000원\n합계금액 1,100,000원\n"
+    fields = run_gate(
+        [ExtractedValue("supplier_name", "주식회사 가온소프트", None, None)],
+        doc,
+        load_rule_pack(RULES),
+    )
+    assert fields[0].verdict is Verdict.VERIFIED
+    assert not any(c.name == "rules_applied" for c in fields[0].checks)

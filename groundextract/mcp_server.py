@@ -72,8 +72,17 @@ MAX_VALUES = 256
 MAX_VALUE_CHARS = 1024
 #: 256 KiB of extracted text is a very long regulatory document — the Korean
 #: forms this gate targets run to a few KiB. The cap is what bounds the worst
-#: case a caller can ask for (MAX_VALUES fields x this much text).
+#: case a caller can ask for (MAX_VALUES fields x this much text). Both tools
+#: apply it: ``extract_verified`` sends its ``full_text`` to a model and then
+#: gates the answer, so an unbounded string there costs strictly more than one
+#: handed to ``verify_extraction``.
 MAX_FULL_TEXT_CHARS = 256 * 1024
+
+#: Ceiling on a caller-chosen ``timeout`` for the Ollama call. The stdio loop is
+#: sequential, so this is how long one caller may keep every other caller
+#: waiting; ``DEFAULT_TIMEOUT`` (120s) is the deployment's own choice and this
+#: only bounds how far a request may push past it.
+MAX_TIMEOUT_SECONDS = 600.0
 
 # JSON-RPC 2.0 error codes.
 PARSE_ERROR = -32700
@@ -157,7 +166,12 @@ TOOLS: list[dict[str, Any]] = [
                 # (OLLAMA_HOST), never caller input. See _extractor_kwargs.
                 "timeout": {
                     "type": "number",
-                    "description": "Optional HTTP timeout in seconds for the Ollama call.",
+                    "exclusiveMinimum": 0,
+                    "maximum": MAX_TIMEOUT_SECONDS,
+                    "description": (
+                        "Optional HTTP timeout in seconds for the Ollama call "
+                        f"(default 120, maximum {MAX_TIMEOUT_SECONDS:g})."
+                    ),
                 },
             },
             "required": ["full_text", "doc_type"],
@@ -311,13 +325,22 @@ def _extractor_kwargs(args: dict[str, Any]) -> dict[str, Any]:
     if timeout is not None:
         if isinstance(timeout, bool) or not isinstance(timeout, int | float) or timeout <= 0:
             raise InvalidParamsError("'timeout' must be a positive number")
+        if timeout > MAX_TIMEOUT_SECONDS:
+            raise InvalidParamsError(
+                f"'timeout' exceeds {MAX_TIMEOUT_SECONDS} seconds"
+            )
         kwargs["timeout"] = float(timeout)
     return kwargs
 
 
 def _tool_extract_verified(args: dict[str, Any]) -> dict[str, Any]:
     """Ollama extraction + gate. Degrades to an isError result when unavailable."""
-    full_text = _require_str(args, "full_text")
+    # Same cap as verify_extraction. This tool used to take an unbounded string,
+    # so everything MAX_LINE_CHARS allowed (4 MiB) went into the prompt, over the
+    # wire to Ollama, and back through the gate — on a loop that answers one
+    # caller at a time. A limit only the cheaper of two tools honours is not a
+    # limit.
+    full_text = _require_bounded_str(args, "full_text", MAX_FULL_TEXT_CHARS)
     doc_type = _require_doc_type(args)
     kwargs = _extractor_kwargs(args)
     try:

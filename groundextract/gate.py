@@ -29,12 +29,17 @@ Gate policy (the core trust guarantee):
     document type, or because a sibling field the rule needs is missing —
     would be reported VERIFIED although no arithmetic verification ever ran.
     Such a value is DISCARDED with a failed ``rules_applied`` check.
-  * Purely textual values (상호·품목 등) carry no number, have no arithmetic
-    invariant to satisfy, and are decided by grounding alone. "Numeric" here is
-    the *same* predicate grounding uses (:func:`normalize_number_str`), so the
-    two halves of the gate cannot disagree about what is a number: anything
-    grounding treats as a number needs a rule, anything it treats as text does
-    not.
+  * Purely textual values (상호·품목 등) carry no digits, have no arithmetic
+    invariant to satisfy, and are decided by grounding alone. The predicate is
+    :func:`carries_number` — *any* number token — and deliberately **not**
+    :func:`normalize_number_str`, which answers the narrower "is this one
+    number?" and returns ``None`` for text and multi-token spellings alike.
+    Reading that ``None`` as "text" was itself a bypass: "1 000 000원" and
+    "1.000.000" (space- and dot-separated thousands, ordinary OCR output for
+    Korean invoices) skipped arithmetic entirely and came back VERIFIED at full
+    confidence, while the very same misassignment spelled "1,000,000원" was
+    discarded. A value that holds digits owes the gate a rule, however it is
+    spelled.
   * If any of the above fails, the field is **auto-discarded**: verdict =
     DISCARDED, ``confidence = 0``. This is what kills a hallucinated /
     rule-breaking / unverified number before it reaches downstream.
@@ -58,7 +63,7 @@ from collections.abc import Iterable
 from itertools import combinations
 from typing import Any
 
-from .grounding import ground_value, normalize_number_str
+from .grounding import carries_number, ground_value, normalize_number_str
 from .models import Check, ExtractedValue, Verdict, VerifiedField
 from .rules import RulePack, evaluate_pack_with_fields
 
@@ -109,6 +114,19 @@ def value_number(value: ExtractedValue) -> float | None:
         return float(key)
     except ValueError:  # pragma: no cover - normalize_number_str output is float-safe
         return None
+
+
+def value_carries_number(value: ExtractedValue) -> bool:
+    """Does ``raw`` hold digits at all — the predicate that demands a rule?
+
+    Broader on purpose than :func:`value_number`. A value spelled "1 000 000원"
+    has no single canonical reading, so :func:`value_number` returns ``None``;
+    treating that as "purely textual" let the whole arithmetic requirement fall
+    away and reported the value VERIFIED. Whether a number can be *read* decides
+    what arithmetic runs; whether digits are *present* decides whether the field
+    owed arithmetic in the first place, and those are different questions.
+    """
+    return carries_number(value.raw)
 
 
 def raw_number_agreement(value: ExtractedValue) -> Check | None:
@@ -257,8 +275,17 @@ def _vouching_check(check: Check, referenced: set[str], grounded: set[str]) -> C
 
 
 def _unverified_check(value: ExtractedValue, rule_pack: RulePack | None) -> Check:
-    """Fail-closed check for a number that no arithmetic rule reached."""
-    if rule_pack is None:
+    """Fail-closed check for a value carrying digits that no arithmetic reached."""
+    if value_number(value) is None:
+        # Digits are there but they do not spell one number ("1 000 000원",
+        # "2026-06-27"). No rule could have been evaluated over it even had the
+        # pack named the field, so name that rather than blaming the pack.
+        reason = (
+            f"raw {value.raw!r} carries digits but no single number "
+            "(space- or dot-separated thousands, a date, an identifier), "
+            "so no arithmetic rule could read a value from it"
+        )
+    elif rule_pack is None:
         reason = "no rule pack was loaded for this document"
     else:
         reason = (
@@ -336,7 +363,7 @@ def run_gate(
             for check, fields, downgraded in vouched
             if v.field in fields
         ]
-        if not arithmetic and value_number(v) is not None:
+        if not arithmetic and value_carries_number(v):
             # FAIL-CLOSED: a number nothing checked is unverified, not "fine".
             # This is also what keeps the all() below from passing vacuously.
             arithmetic.append(_unverified_check(v, rule_pack))
