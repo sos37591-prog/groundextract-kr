@@ -9,6 +9,8 @@
 
 [![PyPI](https://img.shields.io/pypi/v/groundextract.svg)](https://pypi.org/project/groundextract/)
 
+<!-- mcp-name: io.github.sos37591-prog/groundextract-kr -->
+
 > **[▶ Live demo](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet&injected=1)**
 > — opens with the *환각 주입* (hallucination injected) toggle already on: one digit of
 > 비유동자산 is misread, the wrong number is present in the document text so grounding passes,
