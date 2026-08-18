@@ -52,9 +52,19 @@ from groundextract.rules import RulePack, load_rule_pack  # noqa: E402
 RULES_DIR = ROOT / "rules"
 DEFAULT_OUT_DIR = ROOT / "bench" / "golden"
 
-BAD_FIELD_RATE = 0.20  # ~20% of all labeled fields carry an injected error
+BAD_FIELD_RATE = 0.20  # target: ~20% of all labeled fields carry an injected error
 SWAP_SHARE = 0.4       # of the injected errors, this share are field-swaps
 MIN_SWAPS = 3          # always include a few arithmetic-only catches
+
+#: Share of documents that may carry an injection. At most one error goes into a
+#: document (so a labeled fault is never ambiguous), which puts a ceiling on the
+#: field-level rate: a 15-field 세액조정계산서 contributes fifteen fields but only
+#: one possible error, so BAD_FIELD_RATE became unreachable once the wide forms
+#: joined the suite. Without this cap the shortfall was spent by injecting into
+#: *every* document, leaving no clean one - and a clean document is the only case
+#: that exercises "the gate must not discard anything", which is the generator's
+#: own correctness check in :func:`_validate`. The realised rate is reported.
+MAX_BAD_DOC_SHARE = 0.75
 MAX_DOC_ATTEMPTS = 50  # deterministic re-rolls if a candidate fails the gate
 
 # Same number-token pattern the grounding matcher uses (PARTIAL_NUMERIC tier).
@@ -72,7 +82,45 @@ _RULE_FIELDS = {
         "total_equity",
         "total_liab_equity",
     ),
+    "income_statement": (
+        "revenue",
+        "cogs",
+        "gross_profit",
+        "sga",
+        "operating_income",
+        "non_operating_income",
+        "non_operating_expense",
+        "pretax_income",
+        "income_tax_expense",
+        "net_income",
+    ),
+    "corporate_tax_return": (
+        "net_income_per_books",
+        "gross_additions",
+        "gross_deductions",
+        "adjusted_income",
+        "donation_excess",
+        "donation_carryover_deduction",
+        "income_for_year",
+        "loss_carryforward",
+        "nontaxable_income",
+        "income_deduction",
+        "taxable_income",
+        "tax_after_credits",
+        "credits_excluded_from_min_tax",
+        "additional_tax",
+        "tax_payable",
+    ),
 }
+
+#: Smallest amount any generated field may carry. Two injection mechanics depend
+#: on it. ``_inject_ungrounded`` rewrites a quote with ``str.replace`` on the
+#: comma-formatted amount, so an amount that is a substring of the line's *code
+#: number* would corrupt the code as well - "035 0" with the amount 0 becomes
+#: "35 <fake>". At >= 100,000 every amount carries a comma and no three-digit
+#: form code can collide with it. It also keeps a zero out of the labels, where
+#: grounding would be vacuous because a statement is full of zeros.
+MIN_AMOUNT = 100_000
 
 _COMPANIES = [
     "주식회사 한빛상사", "(주)미래유통", "동성물산 주식회사", "(주)가온소프트",
@@ -86,10 +134,31 @@ _ITEMS = [
 ]
 _DEBIT_ACCOUNTS = ["현금", "보통예금", "외상매출금", "미수금", "비품", "소모품비", "지급수수료"]
 _CREDIT_ACCOUNTS = ["외상매입금", "미지급금", "자본금", "매출", "단기차입금", "선수금"]
-_CURRENT_ASSETS = ["현금및현금성자산", "단기금융상품", "매출채권", "재고자산", "선급금"]
-_NONCURRENT_ASSETS = ["토지", "건물", "기계장치", "무형자산", "보증금"]
-_LIABILITIES = ["매입채무", "미지급금", "단기차입금", "예수금", "장기차입금"]
-_EQUITY = ["자본금", "자본잉여금", "이익잉여금"]
+
+# 표준재무상태표·표준손익계산서 line items as (계정과목, 코드). The code numbers are
+# the real ones from 법인세법 시행규칙 [별지 제3호의3서식]: the generated documents
+# reproduce the form's three-column layout (계정과목 / 코드 / 금액) rather than a
+# prose approximation, so the benchmark exercises the same text an OCR pass over a
+# filed return actually produces - including the stray number tokens the code
+# column adds next to every amount.
+_CURRENT_ASSETS = [
+    ("현금 및 현금성자산", "003"), ("단기금융상품", "005"), ("매출채권", "009"),
+    ("재고자산", "044"), ("선급금", "069"),
+]
+_NONCURRENT_ASSETS = [
+    ("투자자산", "081"), ("유형자산", "110"), ("무형자산", "169"),
+    ("기타비유동자산", "194"), ("보증금", "217"),
+]
+_LIABILITIES = [
+    ("매입채무", "230"), ("단기차입금", "234"), ("미지급금", "238"),
+    ("예수금", "246"), ("장기차입금", "285"),
+]
+_EQUITY = [("자본금", "334"), ("자본잉여금", "337"), ("이익잉여금", "372")]
+_REVENUE_ITEMS = [("제품매출", "002"), ("상품매출", "010"), ("서비스매출", "025")]
+_SGA_ITEMS = [
+    ("급여", "068"), ("복리후생비", "079"), ("여비교통비", "080"),
+    ("지급수수료", "104"), ("소모품비", "108"),
+]
 
 
 @dataclass
@@ -223,6 +292,34 @@ def _build_stmt(rng: random.Random) -> BuiltDoc:
     return BuiltDoc("statement", "\n".join(lines) + "\n", fields, swap_sources)
 
 
+def _amount(rng: random.Random, lo: int, hi: int) -> int:
+    """A realistic KRW figure in [lo, hi]: a multiple of 1,000 and >= MIN_AMOUNT."""
+    lo = max(lo, MIN_AMOUNT)
+    hi = max(hi, lo + 1_000)
+    return rng.randrange(lo // 1_000, hi // 1_000 + 1) * 1_000
+
+
+def _form_header(rng: random.Random, title: str, subtitle: str, company: str) -> list[str]:
+    """The masthead every 법인세법 시행규칙 별지서식 carries above its table."""
+    return [
+        title,
+        "(일반법인용)                                        (단위: 원)",
+        f"법인명 {company}",
+        f"사업자등록번호 {_reg_no(rng)}",
+        subtitle,
+        "계 정 과 목 코드 금 액",
+    ]
+
+
+def _rows(rng: random.Random, catalog: list[tuple[str, str]], amounts: list[int]) -> list[str]:
+    """Detail lines in the form's three-column layout: 계정과목 / 코드 / 금액."""
+    picked = rng.sample(catalog, len(amounts))
+    return [
+        f"  {name} {code} {amt:,}"
+        for (name, code), amt in zip(picked, amounts, strict=True)
+    ]
+
+
 def _build_balance(rng: random.Random) -> BuiltDoc:
     """표준재무상태표 — three overlapping invariants over six totals.
 
@@ -230,6 +327,12 @@ def _build_balance(rng: random.Random) -> BuiltDoc:
     that figure is itself a field. Every total is therefore covered by two rules,
     which is what lets the gate say *which* of them broke rather than discarding
     the whole statement.
+
+    The layout is the filed one — 계정과목 / 코드 / 금액 columns, roman-numeral
+    section headers, no 원 suffix on the amount column — because that is the text
+    an OCR pass over a real return yields. Extracted values still carry 원, which
+    is what an extractor emits, so the grounding tier under test is
+    PARTIAL_NUMERIC rather than a plain substring hit.
     """
     current_parts = _split_amount(rng, rng.randrange(300, 40_001), rng.randrange(2, 4))
     noncurrent_parts = _split_amount(rng, rng.randrange(200, 30_001), rng.randrange(2, 4))
@@ -240,43 +343,32 @@ def _build_balance(rng: random.Random) -> BuiltDoc:
     # Split the same total across the funding side (부채 + 자본 = 자산).
     liabilities = rng.randrange(1, assets // 1_000) * 1_000
     equity = assets - liabilities
-    liab_parts = _split_amount(rng, liabilities // 1_000, rng.randrange(2, 4))
+    cur_liab_parts = _split_amount(rng, liabilities // 1_000, rng.randrange(2, 4))
     equity_parts = _split_amount(rng, equity // 1_000, rng.randrange(2, 4))
 
     company = rng.choice(_COMPANIES)
-    term = rng.randrange(3, 30)
+    year = rng.randrange(2022, 2027)
 
-    def rows(names: list[str], amounts: list[int]) -> list[str]:
-        return [
-            f"  {name}  {amt:,}원"
-            for name, amt in zip(rng.sample(names, len(amounts)), amounts, strict=True)
-        ]
+    current_lines = _rows(rng, _CURRENT_ASSETS, current_parts)
+    noncurrent_lines = _rows(rng, _NONCURRENT_ASSETS, noncurrent_parts)
+    liab_lines = _rows(rng, _LIABILITIES, cur_liab_parts)
+    equity_lines = _rows(rng, _EQUITY, equity_parts)
 
-    current_lines = rows(_CURRENT_ASSETS, current_parts)
-    noncurrent_lines = rows(_NONCURRENT_ASSETS, noncurrent_parts)
-    liab_lines = rows(_LIABILITIES, liab_parts)
-    equity_lines = rows(_EQUITY, equity_parts)
-
-    current_line = f"유동자산  {current:,}원"
-    noncurrent_line = f"비유동자산  {noncurrent:,}원"
-    assets_line = f"자산총계  {assets:,}원"
-    liab_line = f"부채총계  {liabilities:,}원"
-    equity_line = f"자본총계  {equity:,}원"
-    liab_equity_line = f"부채와자본총계  {assets:,}원"
+    current_line = f"Ⅰ.유동자산 001 {current:,}"
+    noncurrent_line = f"Ⅱ.비유동자산 080 {noncurrent:,}"
+    assets_line = f"자산총계(Ⅰ+Ⅱ) 228 {assets:,}"
+    liab_line = f"부채총계(Ⅰ+Ⅱ) 333 {liabilities:,}"
+    equity_line = f"자본총계(Ⅲ+～Ⅶ) 382 {equity:,}"
+    liab_equity_line = f"부채와 자본총계 383 {assets:,}"
 
     lines = [
-        "표준재무상태표",
-        f"{company}  제{term}기  2026년 12월 31일 현재",
-        "(단위: 원)",
-        "",
-        "[자산]",
-        *current_lines,
+        *_form_header(rng, "표준재무상태표", f"{year}년12월31일 현재", company),
         current_line,
-        *noncurrent_lines,
+        *current_lines,
         noncurrent_line,
+        *noncurrent_lines,
         assets_line,
-        "",
-        "[부채와 자본]",
+        "Ⅰ.유동부채 229",
         *liab_lines,
         liab_line,
         *equity_lines,
@@ -294,12 +386,137 @@ def _build_balance(rng: random.Random) -> BuiltDoc:
     swap_sources = [
         (amt, line)
         for amt, line in zip(
-            current_parts + noncurrent_parts + liab_parts + equity_parts,
+            current_parts + noncurrent_parts + cur_liab_parts + equity_parts,
             current_lines + noncurrent_lines + liab_lines + equity_lines,
             strict=True,
         )
     ]
     return BuiltDoc("balance_sheet", "\n".join(lines) + "\n", fields, swap_sources)
+
+
+def _build_income(rng: random.Random) -> BuiltDoc:
+    """표준손익계산서 — one subtraction chain, four links.
+
+    Every subtotal is the previous one adjusted by a line group, so a misread in
+    the middle breaks the link above it *and* the one below. The last link,
+    당기순손익, is the figure both 재무상태표(이익잉여금) and the 법인세 조정계산서
+    re-state, which is why this form is the hinge of a filed return.
+    """
+    revenue = _amount(rng, 20_000_000, 900_000_000)
+    cogs = _amount(rng, 1_000_000, max(2_000_000, revenue // 2))
+    gross_profit = revenue - cogs
+    sga = _amount(rng, 1_000_000, max(2_000_000, gross_profit - 1_000_000))
+    operating_income = gross_profit - sga
+    non_operating_income = _amount(rng, MIN_AMOUNT, 5_000_000)
+    non_operating_expense = _amount(rng, MIN_AMOUNT, 4_000_000)
+    pretax_income = operating_income + non_operating_income - non_operating_expense
+    income_tax_expense = _amount(rng, MIN_AMOUNT, max(1_000_000, abs(pretax_income) // 5))
+    net_income = pretax_income - income_tax_expense
+
+    company = rng.choice(_COMPANIES)
+    year = rng.randrange(2022, 2027)
+    revenue_lines = _rows(rng, _REVENUE_ITEMS, [revenue])
+    sga_lines = _rows(rng, _SGA_ITEMS, _split_amount(rng, sga // 1_000, rng.randrange(2, 4)))
+
+    rows = [
+        ("revenue", f"Ⅰ.매출액 001 {revenue:,}", revenue),
+        ("cogs", f"Ⅱ.매출원가 035 {cogs:,}", cogs),
+        ("gross_profit", f"Ⅲ.매출총손익 066 {gross_profit:,}", gross_profit),
+        ("sga", f"Ⅳ.판매비와관리비 067 {sga:,}", sga),
+        ("operating_income", f"Ⅴ.영업손익 129 {operating_income:,}", operating_income),
+        ("non_operating_income", f"Ⅵ.영업외수익 130 {non_operating_income:,}",
+         non_operating_income),
+        ("non_operating_expense", f"Ⅶ.영업외비용 179 {non_operating_expense:,}",
+         non_operating_expense),
+        ("pretax_income", f"Ⅷ.법인세비용차감전손익 217 {pretax_income:,}", pretax_income),
+        ("income_tax_expense", f"Ⅸ.법인세비용 218 {income_tax_expense:,}", income_tax_expense),
+        ("net_income", f"Ⅹ.당기순손익 219 {net_income:,}", net_income),
+    ]
+    lines = [
+        *_form_header(
+            rng, "표준손익계산서",
+            f"{year}년 01월 01일 부터 {year}년 12월 31일 까지", company,
+        ),
+        rows[0][1], *revenue_lines,
+        rows[1][1], rows[2][1],
+        rows[3][1], *sga_lines,
+        *[r[1] for r in rows[4:]],
+    ]
+    fields = [GenField(name, f"{amt:,}원", amt, line) for name, line, amt in rows]
+    swap_sources = [
+        (int(_NUM_TOKEN.findall(ln)[-1].replace(",", "")), ln)
+        for ln in revenue_lines + sga_lines
+    ]
+    return BuiltDoc("income_statement", "\n".join(lines) + "\n", fields, swap_sources)
+
+
+def _build_taxreturn(rng: random.Random) -> BuiltDoc:
+    """법인세 과세표준 및 세액조정계산서 — the form that prints its own arithmetic.
+
+    Each line carries its formula in the margin — "(101＋102－103)", "(122-123+124)"
+    — so the invariants are transcribed from the document rather than supplied as
+    domain knowledge. 산출세액 is deliberately absent from the labels: 법인세 is a
+    bracketed schedule, and the pack does not encode a rule it cannot express.
+    """
+    books = _amount(rng, 5_000_000, 400_000_000)
+    additions = _amount(rng, MIN_AMOUNT, 20_000_000)
+    deductions = _amount(rng, MIN_AMOUNT, 10_000_000)
+    adjusted = books + additions - deductions
+    donation_excess = _amount(rng, MIN_AMOUNT, 3_000_000)
+    donation_carryover = _amount(rng, MIN_AMOUNT, 2_000_000)
+    income_for_year = adjusted + donation_excess - donation_carryover
+    # 과세표준 must stay positive: cap the three deductions well below the income.
+    room = max(income_for_year // 8, 3 * MIN_AMOUNT)
+    loss_carryforward = _amount(rng, MIN_AMOUNT, room)
+    nontaxable = _amount(rng, MIN_AMOUNT, room)
+    income_deduction = _amount(rng, MIN_AMOUNT, room)
+    taxable = income_for_year - loss_carryforward - nontaxable - income_deduction
+
+    after_credits = _amount(rng, 1_000_000, 60_000_000)
+    exempt_credits = _amount(rng, MIN_AMOUNT, max(MIN_AMOUNT + 1_000, after_credits // 2))
+    additional = _amount(rng, MIN_AMOUNT, 2_000_000)
+    payable = after_credits - exempt_credits + additional
+
+    company = rng.choice(_COMPANIES)
+    year = rng.randrange(2022, 2027)
+    rows = [
+        ("net_income_per_books", "101 결 산 서 상 당 기 순 손 익 01", books, ""),
+        ("gross_additions", "102 익 금 산 입 02", additions, ""),
+        ("gross_deductions", "103 손 금 산 입 03", deductions, ""),
+        ("adjusted_income", "104 차 가 감 소 득 금 액 04", adjusted, " (101＋102－103)"),
+        ("donation_excess", "105 기 부 금 한 도 초 과 액 05", donation_excess, ""),
+        ("donation_carryover_deduction", "106 기부금한도초과이월액 손금산입 54",
+         donation_carryover, ""),
+        ("income_for_year", "107 각 사 업 연 도 소 득 금 액 06", income_for_year,
+         " (104+105-106)"),
+        ("loss_carryforward", "109 이 월 결 손 금 07", loss_carryforward, ""),
+        ("nontaxable_income", "110 비 과 세 소 득 08", nontaxable, ""),
+        ("income_deduction", "111 소 득 공 제 09", income_deduction, ""),
+        ("taxable_income", "112 과 세 표 준 10", taxable, " (108－109－110-111)"),
+        ("tax_after_credits", "122 차 감 세 액 18", after_credits, ""),
+        ("credits_excluded_from_min_tax", "123 최저한세 적용제외 공제감면세액 19",
+         exempt_credits, ""),
+        ("additional_tax", "124 가 산 세 액 20", additional, ""),
+        ("tax_payable", "125 가 감 계 21", payable, " (122-123+124)"),
+    ]
+    lines = [
+        "법인세 과세표준 및 세액조정계산서",
+        "■ 법인세법 시행규칙 [별지 제3호서식]                    (단위: 원)",
+        f"법인명 {company}",
+        f"사업자등록번호 {_reg_no(rng)}",
+        f"사 업 연 도 {year}.01.01 ~ {year}.12.31",
+        "① 각 사업연도 소득계산",
+    ]
+    fields = []
+    for name, label, amt, note in rows:
+        line = f"{label} {amt:,}{note}"
+        lines.append(line)
+        fields.append(GenField(name, f"{amt:,}원", amt, line))
+    # No detail rows on this form: every printed amount is itself a labeled total,
+    # so a field-swap has to take another labeled figure. `_inject_swap` already
+    # refuses a source equal to the target's own value.
+    swap_sources = [(amt, f"{label} {amt:,}{note}") for _n, label, amt, note in rows]
+    return BuiltDoc("corporate_tax_return", "\n".join(lines) + "\n", fields, swap_sources)
 
 
 # --- error injection -----------------------------------------------------------
@@ -374,8 +591,12 @@ def _generate_doc(
             doc = _build_tax(rng, with_items)
         elif doc_type == "statement":
             doc = _build_stmt(rng)
-        else:
+        elif doc_type == "balance_sheet":
             doc = _build_balance(rng)
+        elif doc_type == "income_statement":
+            doc = _build_income(rng)
+        else:
+            doc = _build_taxreturn(rng)
         injected: str | None = None
         if kind == "ungrounded":
             injected = _inject_ungrounded(rng, doc)
@@ -392,7 +613,13 @@ def _generate_doc(
 
 
 def generate(
-    count_tax: int, count_stmt: int, count_balance: int, seed: int, out_dir: Path
+    count_tax: int,
+    count_stmt: int,
+    count_balance: int,
+    seed: int,
+    out_dir: Path,
+    count_income: int = 0,
+    count_taxreturn: int = 0,
 ) -> dict:
     """Generate the synthetic golden set; return generation statistics."""
     rng = random.Random(seed)
@@ -404,7 +631,14 @@ def generate(
     layouts = [("tax_invoice", i % 3 == 0) for i in range(count_tax)]
     layouts += [("statement", False) for _ in range(count_stmt)]
     layouts += [("balance_sheet", False) for _ in range(count_balance)]
-    per_doc = {"statement": 2, "balance_sheet": 6}
+    layouts += [("income_statement", False) for _ in range(count_income)]
+    layouts += [("corporate_tax_return", False) for _ in range(count_taxreturn)]
+    per_doc = {
+        "statement": 2,
+        "balance_sheet": 6,
+        "income_statement": 10,
+        "corporate_tax_return": 15,
+    }
     total_fields = sum(
         (5 if with_items else 3) if doc_type == "tax_invoice" else per_doc[doc_type]
         for doc_type, with_items in layouts
@@ -412,7 +646,7 @@ def generate(
 
     # ~20% of fields bad, at most one injection per doc, with a guaranteed
     # handful of field-swap ("only arithmetic catches it") cases.
-    n_bad = min(round(BAD_FIELD_RATE * total_fields), len(layouts))
+    n_bad = min(round(BAD_FIELD_RATE * total_fields), int(len(layouts) * MAX_BAD_DOC_SHARE))
     n_swap = round(SWAP_SHARE * n_bad)
     if n_bad >= MIN_SWAPS:
         n_swap = max(n_swap, MIN_SWAPS)
@@ -425,7 +659,13 @@ def generate(
     for stale in sorted(out_dir.glob("gen_*.json")):
         stale.unlink()  # regenerate our own files only; hand-written goldens stay
 
-    prefix = {"tax_invoice": "gen_tax", "statement": "gen_stmt", "balance_sheet": "gen_bs"}
+    prefix = {
+        "tax_invoice": "gen_tax",
+        "statement": "gen_stmt",
+        "balance_sheet": "gen_bs",
+        "income_statement": "gen_is",
+        "corporate_tax_return": "gen_ctr",
+    }
     counters = dict.fromkeys(_RULE_FIELDS, 0)
     written: list[str] = []
     for idx, (doc_type, with_items) in enumerate(layouts):
@@ -456,6 +696,8 @@ def generate(
         "tax_docs": count_tax,
         "stmt_docs": count_stmt,
         "balance_docs": count_balance,
+        "income_docs": count_income,
+        "taxreturn_docs": count_taxreturn,
         "fields": total_fields,
         "bad_fields": n_bad,
         "ungrounded": n_bad - n_swap,
@@ -472,7 +714,8 @@ def _print_stats(stats: dict) -> None:
     print("=== NumHall-KR golden generator ===")
     print(
         f"seed={stats['seed']}  tax={stats['tax_docs']}  "
-        f"stmt={stats['stmt_docs']}  balance={stats['balance_docs']}"
+        f"stmt={stats['stmt_docs']}  balance={stats['balance_docs']}  "
+        f"income={stats['income_docs']}  taxreturn={stats['taxreturn_docs']}"
     )
     print(f"out: {stats['out_dir']}")
     print(
@@ -495,13 +738,25 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--count-balance", type=int, default=10, help="balance sheets (default 10)"
     )
+    parser.add_argument(
+        "--count-income", type=int, default=8, help="income statements (default 8)"
+    )
+    parser.add_argument(
+        "--count-taxreturn", type=int, default=6, help="corporate tax returns (default 6)"
+    )
     parser.add_argument("--seed", type=int, default=42, help="RNG seed (default 42)")
     parser.add_argument(
         "--out-dir", type=Path, default=DEFAULT_OUT_DIR, help="output dir (default bench/golden)"
     )
     args = parser.parse_args(argv)
     stats = generate(
-        args.count_tax, args.count_stmt, args.count_balance, args.seed, args.out_dir
+        args.count_tax,
+        args.count_stmt,
+        args.count_balance,
+        args.seed,
+        args.out_dir,
+        count_income=args.count_income,
+        count_taxreturn=args.count_taxreturn,
     )
     _print_stats(stats)
 

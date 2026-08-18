@@ -1,24 +1,24 @@
 {
   "doc_id": "gen_stmt_005",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n(주)누리상사  2026년 01월 12일 현재\n(단위: 원)\n\n계정과목  차변  대변\n지급수수료  차변 30,535,000원\n미수금  차변 5,026,000원\n소모품비  차변 18,363,000원\n단기차입금  대변 4,081,000원\n외상매입금  대변 9,475,000원\n매출  대변 40,368,000원\n\n차변 합계  53,924,000원\n대변 합계  53,924,000원\n",
+  "full_text": "합계잔액시산표\n(주)누리상사  2026년 01월 12일 현재\n(단위: 원)\n\n계정과목  차변  대변\n미수금  차변 8,162,000원\n비품  차변 46,335,000원\n현금  차변 17,124,000원\n단기차입금  대변 55,070,000원\n매출  대변 16,551,000원\n\n차변 합계  71,621,000원\n대변 합계  71,621,000원\n",
   "injected_error": {
-    "kind": "ungrounded",
+    "kind": "field-swap",
     "field": "credit_total"
   },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "53,924,000원",
-      "number": 53924000,
-      "grounding_quote": "차변 합계  53,924,000원",
+      "raw": "71,621,000원",
+      "number": 71621000,
+      "grounding_quote": "차변 합계  71,621,000원",
       "expected_verdict": "verified"
     },
     {
       "field": "credit_total",
-      "raw": "56,340,084원",
-      "number": 56340084,
-      "grounding_quote": "대변 합계  56,340,084원",
+      "raw": "55,070,000원",
+      "number": 55070000,
+      "grounding_quote": "단기차입금  대변 55,070,000원",
       "expected_verdict": "discarded"
     }
   ]

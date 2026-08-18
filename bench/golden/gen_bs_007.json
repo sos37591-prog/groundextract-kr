@@ -1,49 +1,52 @@
 {
   "doc_id": "gen_bs_007",
   "doc_type": "balance_sheet",
-  "full_text": "표준재무상태표\n(주)미래유통  제8기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  단기금융상품  20,014,000원\n  선급금  17,252,000원\n  매출채권  1,603,000원\n유동자산  38,869,000원\n  토지  19,977,000원\n  건물  572,000원\n비유동자산  20,549,000원\n자산총계  59,418,000원\n\n[부채와 자본]\n  매입채무  13,618,000원\n  예수금  34,885,000원\n부채총계  48,503,000원\n  자본잉여금  4,336,000원\n  이익잉여금  6,579,000원\n자본총계  10,915,000원\n부채와자본총계  59,418,000원\n",
-  "injected_error": null,
+  "full_text": "표준재무상태표\n(일반법인용)                                        (단위: 원)\n법인명 동성물산 주식회사\n사업자등록번호 816-61-45683\n2022년12월31일 현재\n계 정 과 목 코드 금 액\nⅠ.유동자산 001 15,597,000\n  현금 및 현금성자산 003 12,908,000\n  단기금융상품 005 56,000\n  재고자산 044 2,633,000\nⅡ.비유동자산 080 20,681,000\n  보증금 217 13,931,000\n  무형자산 169 6,750,000\n자산총계(Ⅰ+Ⅱ) 228 36,278,000\nⅠ.유동부채 229\n  예수금 246 5,306,000\n  매입채무 230 2,216,000\n부채총계(Ⅰ+Ⅱ) 333 7,522,000\n  자본잉여금 337 8,705,000\n  이익잉여금 372 20,051,000\n자본총계(Ⅲ+～Ⅶ) 382 28,756,000\n부채와 자본총계 383 36,278,000\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "total_equity"
+  },
   "fields": [
     {
       "field": "current_assets",
-      "raw": "38,869,000원",
-      "number": 38869000,
-      "grounding_quote": "유동자산  38,869,000원",
+      "raw": "15,597,000원",
+      "number": 15597000,
+      "grounding_quote": "Ⅰ.유동자산 001 15,597,000",
       "expected_verdict": "verified"
     },
     {
       "field": "noncurrent_assets",
-      "raw": "20,549,000원",
-      "number": 20549000,
-      "grounding_quote": "비유동자산  20,549,000원",
+      "raw": "20,681,000원",
+      "number": 20681000,
+      "grounding_quote": "Ⅱ.비유동자산 080 20,681,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_assets",
-      "raw": "59,418,000원",
-      "number": 59418000,
-      "grounding_quote": "자산총계  59,418,000원",
+      "raw": "36,278,000원",
+      "number": 36278000,
+      "grounding_quote": "자산총계(Ⅰ+Ⅱ) 228 36,278,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liabilities",
-      "raw": "48,503,000원",
-      "number": 48503000,
-      "grounding_quote": "부채총계  48,503,000원",
+      "raw": "7,522,000원",
+      "number": 7522000,
+      "grounding_quote": "부채총계(Ⅰ+Ⅱ) 333 7,522,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_equity",
-      "raw": "10,915,000원",
-      "number": 10915000,
-      "grounding_quote": "자본총계  10,915,000원",
-      "expected_verdict": "verified"
+      "raw": "58,855,000원",
+      "number": 58855000,
+      "grounding_quote": "자본총계(Ⅲ+～Ⅶ) 382 58,855,000",
+      "expected_verdict": "discarded"
     },
     {
       "field": "total_liab_equity",
-      "raw": "59,418,000원",
-      "number": 59418000,
-      "grounding_quote": "부채와자본총계  59,418,000원",
+      "raw": "36,278,000원",
+      "number": 36278000,
+      "grounding_quote": "부채와 자본총계 383 36,278,000",
       "expected_verdict": "verified"
     }
   ]

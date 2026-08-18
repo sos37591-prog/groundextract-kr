@@ -1,0 +1,116 @@
+{
+  "doc_id": "gen_ctr_004",
+  "doc_type": "corporate_tax_return",
+  "full_text": "법인세 과세표준 및 세액조정계산서\n■ 법인세법 시행규칙 [별지 제3호서식]                    (단위: 원)\n법인명 (주)가온소프트\n사업자등록번호 966-81-57942\n사 업 연 도 2025.01.01 ~ 2025.12.31\n① 각 사업연도 소득계산\n101 결 산 서 상 당 기 순 손 익 01 147,882,000\n102 익 금 산 입 02 5,491,000\n103 손 금 산 입 03 4,310,000\n104 차 가 감 소 득 금 액 04 149,063,000 (101＋102－103)\n105 기 부 금 한 도 초 과 액 05 2,073,000\n106 기부금한도초과이월액 손금산입 54 1,751,000\n107 각 사 업 연 도 소 득 금 액 06 149,385,000 (104+105-106)\n109 이 월 결 손 금 07 9,771,000\n110 비 과 세 소 득 08 11,199,000\n111 소 득 공 제 09 3,873,000\n112 과 세 표 준 10 124,542,000 (108－109－110-111)\n122 차 감 세 액 18 31,692,000\n123 최저한세 적용제외 공제감면세액 19 1,333,000\n124 가 산 세 액 20 388,000\n125 가 감 계 21 30,747,000 (122-123+124)\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "gross_additions"
+  },
+  "fields": [
+    {
+      "field": "net_income_per_books",
+      "raw": "147,882,000원",
+      "number": 147882000,
+      "grounding_quote": "101 결 산 서 상 당 기 순 손 익 01 147,882,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "gross_additions",
+      "raw": "1,968,130원",
+      "number": 1968130,
+      "grounding_quote": "102 익 금 산 입 02 1,968,130",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "gross_deductions",
+      "raw": "4,310,000원",
+      "number": 4310000,
+      "grounding_quote": "103 손 금 산 입 03 4,310,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "adjusted_income",
+      "raw": "149,063,000원",
+      "number": 149063000,
+      "grounding_quote": "104 차 가 감 소 득 금 액 04 149,063,000 (101＋102－103)",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "donation_excess",
+      "raw": "2,073,000원",
+      "number": 2073000,
+      "grounding_quote": "105 기 부 금 한 도 초 과 액 05 2,073,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "donation_carryover_deduction",
+      "raw": "1,751,000원",
+      "number": 1751000,
+      "grounding_quote": "106 기부금한도초과이월액 손금산입 54 1,751,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "income_for_year",
+      "raw": "149,385,000원",
+      "number": 149385000,
+      "grounding_quote": "107 각 사 업 연 도 소 득 금 액 06 149,385,000 (104+105-106)",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "loss_carryforward",
+      "raw": "9,771,000원",
+      "number": 9771000,
+      "grounding_quote": "109 이 월 결 손 금 07 9,771,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "nontaxable_income",
+      "raw": "11,199,000원",
+      "number": 11199000,
+      "grounding_quote": "110 비 과 세 소 득 08 11,199,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "income_deduction",
+      "raw": "3,873,000원",
+      "number": 3873000,
+      "grounding_quote": "111 소 득 공 제 09 3,873,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "taxable_income",
+      "raw": "124,542,000원",
+      "number": 124542000,
+      "grounding_quote": "112 과 세 표 준 10 124,542,000 (108－109－110-111)",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "tax_after_credits",
+      "raw": "31,692,000원",
+      "number": 31692000,
+      "grounding_quote": "122 차 감 세 액 18 31,692,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "credits_excluded_from_min_tax",
+      "raw": "1,333,000원",
+      "number": 1333000,
+      "grounding_quote": "123 최저한세 적용제외 공제감면세액 19 1,333,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "additional_tax",
+      "raw": "388,000원",
+      "number": 388000,
+      "grounding_quote": "124 가 산 세 액 20 388,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "tax_payable",
+      "raw": "30,747,000원",
+      "number": 30747000,
+      "grounding_quote": "125 가 감 계 21 30,747,000 (122-123+124)",
+      "expected_verdict": "verified"
+    }
+  ]
+}

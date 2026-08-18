@@ -1,25 +1,25 @@
 {
   "doc_id": "gen_stmt_009",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n(주)가온소프트  2026년 04월 27일 현재\n(단위: 원)\n\n계정과목  차변  대변\n지급수수료  차변 45,871,000원\n소모품비  차변 25,331,000원\n외상매입금  대변 8,994,000원\n선수금  대변 62,208,000원\n\n차변 합계  71,202,000원\n대변 합계  71,202,000원\n",
+  "full_text": "합계잔액시산표\n(주)누리상사  2026년 12월 09일 현재\n(단위: 원)\n\n계정과목  차변  대변\n소모품비  차변 978,000원\n현금  차변 2,193,000원\n단기차입금  대변 1,940,000원\n미지급금  대변 1,231,000원\n\n차변 합계  3,171,000원\n대변 합계  3,171,000원\n",
   "injected_error": {
-    "kind": "ungrounded",
-    "field": "debit_total"
+    "kind": "field-swap",
+    "field": "credit_total"
   },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "32,116,960원",
-      "number": 32116960,
-      "grounding_quote": "차변 합계  32,116,960원",
-      "expected_verdict": "discarded"
+      "raw": "3,171,000원",
+      "number": 3171000,
+      "grounding_quote": "차변 합계  3,171,000원",
+      "expected_verdict": "verified"
     },
     {
       "field": "credit_total",
-      "raw": "71,202,000원",
-      "number": 71202000,
-      "grounding_quote": "대변 합계  71,202,000원",
-      "expected_verdict": "verified"
+      "raw": "2,193,000원",
+      "number": 2193000,
+      "grounding_quote": "현금  차변 2,193,000원",
+      "expected_verdict": "discarded"
     }
   ]
 }

@@ -1,25 +1,25 @@
 {
   "doc_id": "gen_stmt_007",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n(주)미래유통  2026년 11월 14일 현재\n(단위: 원)\n\n계정과목  차변  대변\n미수금  차변 40,781,000원\n비품  차변 20,980,000원\n단기차입금  대변 59,437,000원\n외상매입금  대변 2,324,000원\n\n차변 합계  61,761,000원\n대변 합계  61,761,000원\n",
+  "full_text": "합계잔액시산표\n동성물산 주식회사  2026년 01월 09일 현재\n(단위: 원)\n\n계정과목  차변  대변\n소모품비  차변 12,912,000원\n미수금  차변 4,316,000원\n미지급금  대변 2,751,000원\n매출  대변 14,477,000원\n\n차변 합계  17,228,000원\n대변 합계  17,228,000원\n",
   "injected_error": {
-    "kind": "field-swap",
-    "field": "debit_total"
+    "kind": "ungrounded",
+    "field": "credit_total"
   },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "2,324,000원",
-      "number": 2324000,
-      "grounding_quote": "외상매입금  대변 2,324,000원",
-      "expected_verdict": "discarded"
+      "raw": "17,228,000원",
+      "number": 17228000,
+      "grounding_quote": "차변 합계  17,228,000원",
+      "expected_verdict": "verified"
     },
     {
       "field": "credit_total",
-      "raw": "61,761,000원",
-      "number": 61761000,
-      "grounding_quote": "대변 합계  61,761,000원",
-      "expected_verdict": "verified"
+      "raw": "59,698,000원",
+      "number": 59698000,
+      "grounding_quote": "대변 합계  59,698,000원",
+      "expected_verdict": "discarded"
     }
   ]
 }

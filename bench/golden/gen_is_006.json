@@ -1,0 +1,81 @@
+{
+  "doc_id": "gen_is_006",
+  "doc_type": "income_statement",
+  "full_text": "표준손익계산서\n(일반법인용)                                        (단위: 원)\n법인명 (주)미래유통\n사업자등록번호 467-57-66450\n2025년 01월 01일 부터 2025년 12월 31일 까지\n계 정 과 목 코드 금 액\nⅠ.매출액 001 258,536,000\n  제품매출 002 258,536,000\nⅡ.매출원가 035 98,880,000\nⅢ.매출총손익 066 159,656,000\nⅣ.판매비와관리비 067 24,692,000\n  여비교통비 080 949,000\n  급여 068 559,000\n  복리후생비 079 23,184,000\nⅤ.영업손익 129 134,964,000\nⅥ.영업외수익 130 3,655,000\nⅦ.영업외비용 179 503,000\nⅧ.법인세비용차감전손익 217 138,116,000\nⅨ.법인세비용 218 25,015,000\nⅩ.당기순손익 219 113,101,000\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "gross_profit"
+  },
+  "fields": [
+    {
+      "field": "revenue",
+      "raw": "258,536,000원",
+      "number": 258536000,
+      "grounding_quote": "Ⅰ.매출액 001 258,536,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "cogs",
+      "raw": "98,880,000원",
+      "number": 98880000,
+      "grounding_quote": "Ⅱ.매출원가 035 98,880,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "gross_profit",
+      "raw": "54,108,000원",
+      "number": 54108000,
+      "grounding_quote": "Ⅲ.매출총손익 066 54,108,000",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "sga",
+      "raw": "24,692,000원",
+      "number": 24692000,
+      "grounding_quote": "Ⅳ.판매비와관리비 067 24,692,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "operating_income",
+      "raw": "134,964,000원",
+      "number": 134964000,
+      "grounding_quote": "Ⅴ.영업손익 129 134,964,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_income",
+      "raw": "3,655,000원",
+      "number": 3655000,
+      "grounding_quote": "Ⅵ.영업외수익 130 3,655,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_expense",
+      "raw": "503,000원",
+      "number": 503000,
+      "grounding_quote": "Ⅶ.영업외비용 179 503,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "pretax_income",
+      "raw": "138,116,000원",
+      "number": 138116000,
+      "grounding_quote": "Ⅷ.법인세비용차감전손익 217 138,116,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "income_tax_expense",
+      "raw": "25,015,000원",
+      "number": 25015000,
+      "grounding_quote": "Ⅸ.법인세비용 218 25,015,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "net_income",
+      "raw": "113,101,000원",
+      "number": 113101000,
+      "grounding_quote": "Ⅹ.당기순손익 219 113,101,000",
+      "expected_verdict": "verified"
+    }
+  ]
+}

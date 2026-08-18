@@ -1,0 +1,47 @@
+# Corporate tax return (법인세 과세표준 및 세액조정계산서) arithmetic rule pack.
+#
+# 법인세법 시행규칙 [별지 제3호서식]. This form is unusual and unusually good for
+# this gate: it *prints its own arithmetic* next to each line — "(101＋102－103)",
+# "(122-123+124)" — so the invariants below are not domain knowledge someone had
+# to supply, they are transcribed from the document itself.
+#
+# Field names carry the form's code number, which is the stable identifier across
+# 사업연도 (the Korean label wording shifts, the code does not).
+#
+# Deliberately NOT encoded: 115 산출세액 = 과세표준 × 세율. 법인세 is a progressive
+# schedule (구간별 세율 + 누진공제), so the printed 세율(%) times 과세표준 only equals
+# 산출세액 for a single-bracket filer. Writing it as a plain multiplication would
+# discard correct figures for every 과세표준 above the first bracket — a rule that
+# is wrong in the *fail-closed* direction still destroys precision, so it stays
+# out until the engine can express a bracketed schedule.
+
+doc_type: corporate_tax_return
+
+rules:
+  # 104 차가감소득금액 = 101 결산서상 당기순손익 + 102 익금산입 − 103 손금산입
+  - name: adjusted_income_eq_books_plus_additions_minus_deductions
+    type: equals
+    lhs: {field: adjusted_income}
+    rhs: {expr: "net_income_per_books + gross_additions - gross_deductions"}
+    tol: 1.0
+
+  # 107 각 사업연도 소득금액 = 104 + 105 기부금한도초과액 − 106 기부금한도초과이월액 손금산입
+  - name: income_for_year_eq_adjusted_plus_donation_adjustments
+    type: equals
+    lhs: {field: income_for_year}
+    rhs: {expr: "adjusted_income + donation_excess - donation_carryover_deduction"}
+    tol: 1.0
+
+  # 112 과세표준 = 108(=107) − 109 이월결손금 − 110 비과세소득 − 111 소득공제
+  - name: taxable_income_eq_income_minus_carryforward_and_deductions
+    type: equals
+    lhs: {field: taxable_income}
+    rhs: {expr: "income_for_year - loss_carryforward - nontaxable_income - income_deduction"}
+    tol: 1.0
+
+  # 125 가감계 = 122 차감세액 − 123 최저한세 적용제외 공제감면세액 + 124 가산세액
+  - name: tax_payable_eq_after_credits_minus_exempt_plus_additional
+    type: equals
+    lhs: {field: tax_payable}
+    rhs: {expr: "tax_after_credits - credits_excluded_from_min_tax + additional_tax"}
+    tol: 1.0

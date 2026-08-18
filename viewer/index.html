@@ -4,17 +4,17 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>GroundExtract-KR · 데모 뷰어</title>
-<meta name="description" content="AI가 규제문서에서 추출한 모든 숫자에 원문 근거와 산술 정합성을 강제하고, 근거 없는 값·규칙 위반 값을 confidence 0으로 자동 폐기하는 오픈소스 게이트. NumHall-KR 벤치마크 숫자 환각률 19.9% → 0.0%." />
+<meta name="description" content="AI가 규제문서에서 추출한 모든 숫자에 원문 근거와 산술 정합성을 강제하고, 근거 없는 값·규칙 위반 값을 confidence 0으로 자동 폐기하는 오픈소스 게이트. NumHall-KR 벤치마크 숫자 환각률 13.4% → 0.0%." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1020'/%3E%3Cpath d='M6.5 17 13 23.5 25.5 9.5' fill='none' stroke='%2322c55e' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="GroundExtract-KR" />
 <meta property="og:locale" content="ko_KR" />
 <meta property="og:url" content="https://sos37591-prog.github.io/groundextract-kr/" />
 <meta property="og:title" content="GroundExtract-KR · 근거 없는 숫자는 confidence 0으로 자동 폐기" />
-<meta property="og:description" content="한국 규제문서(세금계산서·재무제표)에서 AI가 추출한 모든 숫자에 ①원문 verbatim 근거와 ②도메인 산술(부가세=공급가×10%, 자산=부채+자본)을 강제하는 값-수준 신뢰성 게이트. NumHall-KR 벤치마크 46문서·146필드에서 숫자 환각률 19.9% → 0.0%, 자동폐기 재현율 100%. 데모에서 환각을 직접 주입해 폐기 과정을 확인할 수 있습니다. Apache-2.0 오픈소스." />
+<meta property="og:description" content="한국 규제문서(세금계산서·재무제표)에서 AI가 추출한 모든 숫자에 ①원문 verbatim 근거와 ②도메인 산술(부가세=공급가×10%, 자산=부채+자본)을 강제하는 값-수준 신뢰성 게이트. NumHall-KR 벤치마크 72문서·388필드에서 숫자 환각률 13.4% → 0.0%, 자동폐기 재현율 100%. 데모에서 환각을 직접 주입해 폐기 과정을 확인할 수 있습니다. Apache-2.0 오픈소스." />
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="GroundExtract-KR · 근거 없는 숫자는 confidence 0으로 자동 폐기" />
-<meta name="twitter:description" content="AI 추출 숫자에 원문 근거 + 산술 정합성을 강제하는 게이트. 숫자 환각률 19.9% → 0.0%(재현율 100%). 브라우저에서 환각을 주입해 보세요." />
+<meta name="twitter:description" content="AI 추출 숫자에 원문 근거 + 산술 정합성을 강제하는 게이트. 숫자 환각률 13.4% → 0.0%(재현율 100%). 브라우저에서 환각을 주입해 보세요." />
 <style>
   :root{
     --bg:#0b1020; --panel:#121a2e; --line:#26304a; --txt:#e6ebf5; --mut:#8b97b3;
@@ -168,17 +168,17 @@
     <div class="bench">
       <h2>측정된 신뢰성 · NumHall-KR 벤치마크</h2>
       <div class="big">
-        <span class="from">19.9%</span>
+        <span class="from">13.4%</span>
         <span class="arrow">→</span>
         <span class="to">0.0%</span>
         <span class="cap">숫자 환각률 (게이트 전 → 후)</span>
       </div>
       <div class="tiles">
         <div class="tile"><div class="k">자동폐기 재현율</div><div class="v g">100%</div></div>
-        <div class="tile"><div class="k">근거정확도</div><div class="v">64.4%</div></div>
-        <div class="tile"><div class="k">자동폐기 정밀도</div><div class="v">35.8%</div></div>
+        <div class="tile"><div class="k">근거정확도</div><div class="v">90.2%</div></div>
+        <div class="tile"><div class="k">자동폐기 정밀도</div><div class="v">57.8%</div></div>
       </div>
-      <div class="scale">146필드 중 라벨 환각 29건 — 게이트 후 누출 <b style="color:var(--green)">0건</b>(재현율 100%) · 46문서 결정적 재현: <code>python -m groundextract.bench</code></div>
+      <div class="scale">388필드 중 라벨 환각 52건 — 게이트 후 누출 <b style="color:var(--green)">0건</b>(재현율 100%) · 72문서 결정적 재현: <code>python -m groundextract.bench</code></div>
     </div>
   </section>
 </main>

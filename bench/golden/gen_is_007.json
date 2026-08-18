@@ -1,0 +1,78 @@
+{
+  "doc_id": "gen_is_007",
+  "doc_type": "income_statement",
+  "full_text": "표준손익계산서\n(일반법인용)                                        (단위: 원)\n법인명 한결시스템 주식회사\n사업자등록번호 337-69-93611\n2026년 01월 01일 부터 2026년 12월 31일 까지\n계 정 과 목 코드 금 액\nⅠ.매출액 001 613,418,000\n  서비스매출 025 613,418,000\nⅡ.매출원가 035 95,401,000\nⅢ.매출총손익 066 518,017,000\nⅣ.판매비와관리비 067 90,120,000\n  소모품비 108 65,231,000\n  복리후생비 079 24,889,000\nⅤ.영업손익 129 427,897,000\nⅥ.영업외수익 130 1,534,000\nⅦ.영업외비용 179 423,000\nⅧ.법인세비용차감전손익 217 429,008,000\nⅨ.법인세비용 218 79,987,000\nⅩ.당기순손익 219 349,021,000\n",
+  "injected_error": null,
+  "fields": [
+    {
+      "field": "revenue",
+      "raw": "613,418,000원",
+      "number": 613418000,
+      "grounding_quote": "Ⅰ.매출액 001 613,418,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "cogs",
+      "raw": "95,401,000원",
+      "number": 95401000,
+      "grounding_quote": "Ⅱ.매출원가 035 95,401,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "gross_profit",
+      "raw": "518,017,000원",
+      "number": 518017000,
+      "grounding_quote": "Ⅲ.매출총손익 066 518,017,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "sga",
+      "raw": "90,120,000원",
+      "number": 90120000,
+      "grounding_quote": "Ⅳ.판매비와관리비 067 90,120,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "operating_income",
+      "raw": "427,897,000원",
+      "number": 427897000,
+      "grounding_quote": "Ⅴ.영업손익 129 427,897,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_income",
+      "raw": "1,534,000원",
+      "number": 1534000,
+      "grounding_quote": "Ⅵ.영업외수익 130 1,534,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_expense",
+      "raw": "423,000원",
+      "number": 423000,
+      "grounding_quote": "Ⅶ.영업외비용 179 423,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "pretax_income",
+      "raw": "429,008,000원",
+      "number": 429008000,
+      "grounding_quote": "Ⅷ.법인세비용차감전손익 217 429,008,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "income_tax_expense",
+      "raw": "79,987,000원",
+      "number": 79987000,
+      "grounding_quote": "Ⅸ.법인세비용 218 79,987,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "net_income",
+      "raw": "349,021,000원",
+      "number": 349021000,
+      "grounding_quote": "Ⅹ.당기순손익 219 349,021,000",
+      "expected_verdict": "verified"
+    }
+  ]
+}

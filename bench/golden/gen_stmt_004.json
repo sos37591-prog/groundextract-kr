@@ -1,21 +1,24 @@
 {
   "doc_id": "gen_stmt_004",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n(주)가온소프트  2026년 02월 14일 현재\n(단위: 원)\n\n계정과목  차변  대변\n보통예금  차변 20,953,000원\n지급수수료  차변 14,447,000원\n미수금  차변 714,000원\n선수금  대변 9,069,000원\n미지급금  대변 27,045,000원\n\n차변 합계  36,114,000원\n대변 합계  36,114,000원\n",
-  "injected_error": null,
+  "full_text": "합계잔액시산표\n동성물산 주식회사  2026년 12월 07일 현재\n(단위: 원)\n\n계정과목  차변  대변\n현금  차변 17,808,000원\n보통예금  차변 20,142,000원\n미지급금  대변 20,953,000원\n선수금  대변 14,447,000원\n매출  대변 2,550,000원\n\n차변 합계  37,950,000원\n대변 합계  37,950,000원\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "debit_total"
+  },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "36,114,000원",
-      "number": 36114000,
-      "grounding_quote": "차변 합계  36,114,000원",
-      "expected_verdict": "verified"
+      "raw": "43,469,000원",
+      "number": 43469000,
+      "grounding_quote": "차변 합계  43,469,000원",
+      "expected_verdict": "discarded"
     },
     {
       "field": "credit_total",
-      "raw": "36,114,000원",
-      "number": 36114000,
-      "grounding_quote": "대변 합계  36,114,000원",
+      "raw": "37,950,000원",
+      "number": 37950000,
+      "grounding_quote": "대변 합계  37,950,000원",
       "expected_verdict": "verified"
     }
   ]

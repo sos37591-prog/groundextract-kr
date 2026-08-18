@@ -1,0 +1,41 @@
+# Income statement (표준손익계산서) arithmetic rule pack.
+#
+# The form is a single subtraction chain: each subtotal is the previous one
+# adjusted by one line group, and the last link (당기순손익) is the figure the
+# balance sheet and the corporate tax return both re-state. That chain is what
+# makes a misread here catchable — a wrong 판관비 does not merely sit in one
+# cell, it breaks 영업손익 and every subtotal below it.
+#
+# Field names follow 법인세법 시행규칙 [별지 제3호의3서식] 표준손익계산서(일반법인용);
+# the form's own code numbers are in the comments.
+
+doc_type: income_statement
+
+rules:
+  # Ⅲ.매출총손익(066) = Ⅰ.매출액(001) − Ⅱ.매출원가(035)
+  - name: gross_profit_eq_revenue_minus_cogs
+    type: equals
+    lhs: {field: gross_profit}
+    rhs: {expr: "revenue - cogs"}
+    tol: 1.0
+
+  # Ⅴ.영업손익(129) = Ⅲ.매출총손익(066) − Ⅳ.판매비와관리비(067)
+  - name: operating_income_eq_gross_profit_minus_sga
+    type: equals
+    lhs: {field: operating_income}
+    rhs: {expr: "gross_profit - sga"}
+    tol: 1.0
+
+  # Ⅷ.법인세비용차감전손익(217) = Ⅴ.영업손익(129) + Ⅵ.영업외수익(130) − Ⅶ.영업외비용(179)
+  - name: pretax_income_eq_operating_plus_non_operating
+    type: equals
+    lhs: {field: pretax_income}
+    rhs: {expr: "operating_income + non_operating_income - non_operating_expense"}
+    tol: 1.0
+
+  # Ⅹ.당기순손익(219) = Ⅷ.법인세비용차감전손익(217) − Ⅸ.법인세비용(218)
+  - name: net_income_eq_pretax_minus_tax
+    type: equals
+    lhs: {field: net_income}
+    rhs: {expr: "pretax_income - income_tax_expense"}
+    tol: 1.0

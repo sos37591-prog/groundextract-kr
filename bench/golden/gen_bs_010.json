@@ -1,52 +1,52 @@
 {
   "doc_id": "gen_bs_010",
   "doc_type": "balance_sheet",
-  "full_text": "표준재무상태표\n(주)누리상사  제5기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  매출채권  10,521,000원\n  선급금  401,000원\n  단기금융상품  12,181,000원\n유동자산  23,103,000원\n  토지  5,270,000원\n  무형자산  16,888,000원\n비유동자산  22,158,000원\n자산총계  45,261,000원\n\n[부채와 자본]\n  장기차입금  9,445,000원\n  매입채무  6,791,000원\n  단기차입금  5,379,000원\n부채총계  21,615,000원\n  이익잉여금  1,203,000원\n  자본잉여금  16,823,000원\n  자본금  5,620,000원\n자본총계  23,646,000원\n부채와자본총계  45,261,000원\n",
+  "full_text": "표준재무상태표\n(일반법인용)                                        (단위: 원)\n법인명 대현전자 주식회사\n사업자등록번호 621-44-64459\n2022년12월31일 현재\n계 정 과 목 코드 금 액\nⅠ.유동자산 001 13,640,000\n  선급금 069 2,147,000\n  재고자산 044 6,852,000\n  현금 및 현금성자산 003 4,641,000\nⅡ.비유동자산 080 9,638,000\n  유형자산 110 1,990,000\n  투자자산 081 5,952,000\n  보증금 217 1,696,000\n자산총계(Ⅰ+Ⅱ) 228 23,278,000\nⅠ.유동부채 229\n  매입채무 230 727,000\n  단기차입금 234 219,000\n부채총계(Ⅰ+Ⅱ) 333 946,000\n  자본잉여금 337 10,183,000\n  이익잉여금 372 12,149,000\n자본총계(Ⅲ+～Ⅶ) 382 22,332,000\n부채와 자본총계 383 23,278,000\n",
   "injected_error": {
-    "kind": "ungrounded",
-    "field": "current_assets"
+    "kind": "field-swap",
+    "field": "total_liabilities"
   },
   "fields": [
     {
       "field": "current_assets",
-      "raw": "47,519,000원",
-      "number": 47519000,
-      "grounding_quote": "유동자산  47,519,000원",
-      "expected_verdict": "discarded"
+      "raw": "13,640,000원",
+      "number": 13640000,
+      "grounding_quote": "Ⅰ.유동자산 001 13,640,000",
+      "expected_verdict": "verified"
     },
     {
       "field": "noncurrent_assets",
-      "raw": "22,158,000원",
-      "number": 22158000,
-      "grounding_quote": "비유동자산  22,158,000원",
+      "raw": "9,638,000원",
+      "number": 9638000,
+      "grounding_quote": "Ⅱ.비유동자산 080 9,638,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_assets",
-      "raw": "45,261,000원",
-      "number": 45261000,
-      "grounding_quote": "자산총계  45,261,000원",
+      "raw": "23,278,000원",
+      "number": 23278000,
+      "grounding_quote": "자산총계(Ⅰ+Ⅱ) 228 23,278,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liabilities",
-      "raw": "21,615,000원",
-      "number": 21615000,
-      "grounding_quote": "부채총계  21,615,000원",
-      "expected_verdict": "verified"
+      "raw": "219,000원",
+      "number": 219000,
+      "grounding_quote": "  단기차입금 234 219,000",
+      "expected_verdict": "discarded"
     },
     {
       "field": "total_equity",
-      "raw": "23,646,000원",
-      "number": 23646000,
-      "grounding_quote": "자본총계  23,646,000원",
+      "raw": "22,332,000원",
+      "number": 22332000,
+      "grounding_quote": "자본총계(Ⅲ+～Ⅶ) 382 22,332,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liab_equity",
-      "raw": "45,261,000원",
-      "number": 45261000,
-      "grounding_quote": "부채와자본총계  45,261,000원",
+      "raw": "23,278,000원",
+      "number": 23278000,
+      "grounding_quote": "부채와 자본총계 383 23,278,000",
       "expected_verdict": "verified"
     }
   ]

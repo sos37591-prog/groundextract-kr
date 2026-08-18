@@ -1,52 +1,52 @@
 {
   "doc_id": "gen_bs_001",
   "doc_type": "balance_sheet",
-  "full_text": "표준재무상태표\n주식회사 한빛상사  제14기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  선급금  6,499,000원\n  재고자산  16,931,000원\n  매출채권  1,466,000원\n유동자산  24,896,000원\n  기계장치  418,000원\n  토지  2,272,000원\n비유동자산  2,690,000원\n자산총계  27,586,000원\n\n[부채와 자본]\n  장기차입금  19,675,000원\n  단기차입금  2,747,000원\n  매입채무  424,000원\n부채총계  22,846,000원\n  자본잉여금  4,637,000원\n  이익잉여금  103,000원\n자본총계  4,740,000원\n부채와자본총계  27,586,000원\n",
+  "full_text": "표준재무상태표\n(일반법인용)                                        (단위: 원)\n법인명 (주)누리상사\n사업자등록번호 576-65-87656\n2022년12월31일 현재\n계 정 과 목 코드 금 액\nⅠ.유동자산 001 20,064,000\n  재고자산 044 18,545,000\n  매출채권 009 1,519,000\nⅡ.비유동자산 080 25,845,000\n  기타비유동자산 194 11,378,000\n  유형자산 110 14,467,000\n자산총계(Ⅰ+Ⅱ) 228 45,909,000\nⅠ.유동부채 229\n  예수금 246 4,520,000\n  단기차입금 234 19,766,000\n  미지급금 238 10,628,000\n부채총계(Ⅰ+Ⅱ) 333 34,914,000\n  이익잉여금 372 208,000\n  자본잉여금 337 6,675,000\n  자본금 334 4,112,000\n자본총계(Ⅲ+～Ⅶ) 382 10,995,000\n부채와 자본총계 383 45,909,000\n",
   "injected_error": {
     "kind": "ungrounded",
-    "field": "current_assets"
+    "field": "total_assets"
   },
   "fields": [
     {
       "field": "current_assets",
-      "raw": "47,572,000원",
-      "number": 47572000,
-      "grounding_quote": "유동자산  47,572,000원",
-      "expected_verdict": "discarded"
+      "raw": "20,064,000원",
+      "number": 20064000,
+      "grounding_quote": "Ⅰ.유동자산 001 20,064,000",
+      "expected_verdict": "verified"
     },
     {
       "field": "noncurrent_assets",
-      "raw": "2,690,000원",
-      "number": 2690000,
-      "grounding_quote": "비유동자산  2,690,000원",
+      "raw": "25,845,000원",
+      "number": 25845000,
+      "grounding_quote": "Ⅱ.비유동자산 080 25,845,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_assets",
-      "raw": "27,586,000원",
-      "number": 27586000,
-      "grounding_quote": "자산총계  27,586,000원",
-      "expected_verdict": "verified"
+      "raw": "32,277,000원",
+      "number": 32277000,
+      "grounding_quote": "자산총계(Ⅰ+Ⅱ) 228 32,277,000",
+      "expected_verdict": "discarded"
     },
     {
       "field": "total_liabilities",
-      "raw": "22,846,000원",
-      "number": 22846000,
-      "grounding_quote": "부채총계  22,846,000원",
+      "raw": "34,914,000원",
+      "number": 34914000,
+      "grounding_quote": "부채총계(Ⅰ+Ⅱ) 333 34,914,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_equity",
-      "raw": "4,740,000원",
-      "number": 4740000,
-      "grounding_quote": "자본총계  4,740,000원",
+      "raw": "10,995,000원",
+      "number": 10995000,
+      "grounding_quote": "자본총계(Ⅲ+～Ⅶ) 382 10,995,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liab_equity",
-      "raw": "27,586,000원",
-      "number": 27586000,
-      "grounding_quote": "부채와자본총계  27,586,000원",
+      "raw": "45,909,000원",
+      "number": 45909000,
+      "grounding_quote": "부채와 자본총계 383 45,909,000",
       "expected_verdict": "verified"
     }
   ]

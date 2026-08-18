@@ -22,6 +22,10 @@ from pathlib import Path
 
 import pytest
 
+from groundextract import available_doc_types
+from groundextract.llm.openweight import FIELD_SPECS
+from groundextract.mcp_server import SUPPORTED_DOC_TYPES
+
 ROOT = Path(__file__).resolve().parent.parent
 TIMEOUT_S = 60
 CLOSED_PORT_HOST = "http://127.0.0.1:9"
@@ -268,11 +272,20 @@ def test_tools_list_exposes_both_tools(responses: dict[int, dict]) -> None:
         # the Ollama endpoint is server configuration and must not be offered
         # as a tool parameter (SSRF / confused deputy)
         assert "host" not in schema["properties"]
-        assert schema["properties"]["doc_type"]["enum"] == [
-            "tax_invoice",
-            "statement",
-            "balance_sheet",
-        ]
+        assert schema["properties"]["doc_type"]["enum"] == list(SUPPORTED_DOC_TYPES)
+
+
+def test_doc_types_agree_across_the_three_surfaces() -> None:
+    """A doc_type has to exist on all three surfaces or it is unusable.
+
+    A rule pack with no ``FIELD_SPECS`` entry cannot be extracted for; a
+    ``FIELD_SPECS`` entry with no pack extracts values the gate then discards for
+    want of arithmetic; and either one missing from the MCP enum is unreachable by
+    an agent. The three drifted apart silently before, so assert them equal.
+    """
+    packs = set(available_doc_types())
+    assert set(SUPPORTED_DOC_TYPES) == packs
+    assert set(FIELD_SPECS) == packs
 
 
 def test_verify_extraction_discards_hallucinated_vat(responses: dict[int, dict]) -> None:

@@ -6,8 +6,16 @@ and it needs no Python: the gate loads the file, evaluates the invariants over
 whatever fields your extractor produced, and discards the values that break them.
 
 The packs shipped here — [`tax_invoice.yaml`](tax_invoice.yaml),
-[`statement.yaml`](statement.yaml), [`balance_sheet.yaml`](balance_sheet.yaml) —
-are working examples; copy the closest one.
+[`statement.yaml`](statement.yaml), [`balance_sheet.yaml`](balance_sheet.yaml),
+[`income_statement.yaml`](income_statement.yaml),
+[`corporate_tax_return.yaml`](corporate_tax_return.yaml) —
+are working examples; copy the closest one. `corporate_tax_return.yaml` is the one to read
+if you are unsure what an invariant should be: 법인세 과세표준 및 세액조정계산서 prints its
+own arithmetic beside each line, so that pack is a transcription rather than a judgement
+call. It is also the one to read for what a pack should *refuse* to encode — 산출세액 =
+과세표준 × 세율 is left out because 법인세 is a bracketed schedule, and a rule that is wrong
+for large filers destroys their correct values just as thoroughly as a missing rule lets
+bad ones through.
 
 ```bash
 python -m groundextract verify --doc doc.txt --values values.json --rules my_pack.yaml

@@ -1,53 +1,53 @@
 {
   "doc_id": "gen_bs_006",
   "doc_type": "balance_sheet",
-  "full_text": "표준재무상태표\n(주)일송무역  제12기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  현금및현금성자산  3,283,000원\n  단기금융상품  4,493,000원\n유동자산  7,776,000원\n  토지  9,454,000원\n  무형자산  6,859,000원\n비유동자산  16,313,000원\n자산총계  24,089,000원\n\n[부채와 자본]\n  장기차입금  4,972,000원\n  미지급금  15,654,000원\n부채총계  20,626,000원\n  이익잉여금  3,323,000원\n  자본잉여금  140,000원\n자본총계  3,463,000원\n부채와자본총계  24,089,000원\n",
+  "full_text": "표준재무상태표\n(일반법인용)                                        (단위: 원)\n법인명 대현전자 주식회사\n사업자등록번호 337-46-47056\n2022년12월31일 현재\n계 정 과 목 코드 금 액\nⅠ.유동자산 001 4,247,000\n  단기금융상품 005 1,703,000\n  현금 및 현금성자산 003 2,544,000\nⅡ.비유동자산 080 20,696,000\n  기타비유동자산 194 8,672,000\n  보증금 217 12,024,000\n자산총계(Ⅰ+Ⅱ) 228 24,943,000\nⅠ.유동부채 229\n  장기차입금 285 5,147,000\n  예수금 246 16,494,000\n부채총계(Ⅰ+Ⅱ) 333 21,641,000\n  자본잉여금 337 712,000\n  자본금 334 2,590,000\n자본총계(Ⅲ+～Ⅶ) 382 3,302,000\n부채와 자본총계 383 24,943,000\n",
   "injected_error": {
     "kind": "ungrounded",
-    "field": "total_liabilities"
+    "field": "total_liab_equity"
   },
   "fields": [
     {
       "field": "current_assets",
-      "raw": "7,776,000원",
-      "number": 7776000,
-      "grounding_quote": "유동자산  7,776,000원",
+      "raw": "4,247,000원",
+      "number": 4247000,
+      "grounding_quote": "Ⅰ.유동자산 001 4,247,000",
       "expected_verdict": "verified"
     },
     {
       "field": "noncurrent_assets",
-      "raw": "16,313,000원",
-      "number": 16313000,
-      "grounding_quote": "비유동자산  16,313,000원",
+      "raw": "20,696,000원",
+      "number": 20696000,
+      "grounding_quote": "Ⅱ.비유동자산 080 20,696,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_assets",
-      "raw": "24,089,000원",
-      "number": 24089000,
-      "grounding_quote": "자산총계  24,089,000원",
+      "raw": "24,943,000원",
+      "number": 24943000,
+      "grounding_quote": "자산총계(Ⅰ+Ⅱ) 228 24,943,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liabilities",
-      "raw": "40,010,061원",
-      "number": 40010061,
-      "grounding_quote": "부채총계  40,010,061원",
-      "expected_verdict": "discarded"
+      "raw": "21,641,000원",
+      "number": 21641000,
+      "grounding_quote": "부채총계(Ⅰ+Ⅱ) 333 21,641,000",
+      "expected_verdict": "verified"
     },
     {
       "field": "total_equity",
-      "raw": "3,463,000원",
-      "number": 3463000,
-      "grounding_quote": "자본총계  3,463,000원",
+      "raw": "3,302,000원",
+      "number": 3302000,
+      "grounding_quote": "자본총계(Ⅲ+～Ⅶ) 382 3,302,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liab_equity",
-      "raw": "24,089,000원",
-      "number": 24089000,
-      "grounding_quote": "부채와자본총계  24,089,000원",
-      "expected_verdict": "verified"
+      "raw": "9,653,585원",
+      "number": 9653585,
+      "grounding_quote": "부채와 자본총계 383 9,653,585",
+      "expected_verdict": "discarded"
     }
   ]
 }

@@ -1,52 +1,52 @@
 {
   "doc_id": "gen_bs_009",
   "doc_type": "balance_sheet",
-  "full_text": "표준재무상태표\n(주)가온소프트  제24기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  선급금  8,921,000원\n  현금및현금성자산  7,479,000원\n  매출채권  3,828,000원\n유동자산  20,228,000원\n  기계장치  2,636,000원\n  토지  11,709,000원\n  무형자산  3,549,000원\n비유동자산  17,894,000원\n자산총계  38,122,000원\n\n[부채와 자본]\n  예수금  1,321,000원\n  장기차입금  1,152,000원\n  미지급금  140,000원\n부채총계  2,613,000원\n  자본금  1,696,000원\n  자본잉여금  4,290,000원\n  이익잉여금  29,523,000원\n자본총계  35,509,000원\n부채와자본총계  38,122,000원\n",
+  "full_text": "표준재무상태표\n(일반법인용)                                        (단위: 원)\n법인명 (주)미래유통\n사업자등록번호 737-73-91973\n2024년12월31일 현재\n계 정 과 목 코드 금 액\nⅠ.유동자산 001 27,061,000\n  매출채권 009 10,521,000\n  선급금 069 11,438,000\n  현금 및 현금성자산 003 5,102,000\nⅡ.비유동자산 080 3,627,000\n  기타비유동자산 194 1,351,000\n  투자자산 081 2,276,000\n자산총계(Ⅰ+Ⅱ) 228 30,688,000\nⅠ.유동부채 229\n  장기차입금 285 4,723,000\n  예수금 246 6,133,000\n  단기차입금 234 2,633,000\n부채총계(Ⅰ+Ⅱ) 333 13,489,000\n  자본금 334 1,203,000\n  이익잉여금 372 13,701,000\n  자본잉여금 337 2,295,000\n자본총계(Ⅲ+～Ⅶ) 382 17,199,000\n부채와 자본총계 383 30,688,000\n",
   "injected_error": {
     "kind": "field-swap",
-    "field": "current_assets"
+    "field": "total_liabilities"
   },
   "fields": [
     {
       "field": "current_assets",
-      "raw": "1,152,000원",
-      "number": 1152000,
-      "grounding_quote": "  장기차입금  1,152,000원",
-      "expected_verdict": "discarded"
+      "raw": "27,061,000원",
+      "number": 27061000,
+      "grounding_quote": "Ⅰ.유동자산 001 27,061,000",
+      "expected_verdict": "verified"
     },
     {
       "field": "noncurrent_assets",
-      "raw": "17,894,000원",
-      "number": 17894000,
-      "grounding_quote": "비유동자산  17,894,000원",
+      "raw": "3,627,000원",
+      "number": 3627000,
+      "grounding_quote": "Ⅱ.비유동자산 080 3,627,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_assets",
-      "raw": "38,122,000원",
-      "number": 38122000,
-      "grounding_quote": "자산총계  38,122,000원",
+      "raw": "30,688,000원",
+      "number": 30688000,
+      "grounding_quote": "자산총계(Ⅰ+Ⅱ) 228 30,688,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liabilities",
-      "raw": "2,613,000원",
-      "number": 2613000,
-      "grounding_quote": "부채총계  2,613,000원",
-      "expected_verdict": "verified"
+      "raw": "10,521,000원",
+      "number": 10521000,
+      "grounding_quote": "  매출채권 009 10,521,000",
+      "expected_verdict": "discarded"
     },
     {
       "field": "total_equity",
-      "raw": "35,509,000원",
-      "number": 35509000,
-      "grounding_quote": "자본총계  35,509,000원",
+      "raw": "17,199,000원",
+      "number": 17199000,
+      "grounding_quote": "자본총계(Ⅲ+～Ⅶ) 382 17,199,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liab_equity",
-      "raw": "38,122,000원",
-      "number": 38122000,
-      "grounding_quote": "부채와자본총계  38,122,000원",
+      "raw": "30,688,000원",
+      "number": 30688000,
+      "grounding_quote": "부채와 자본총계 383 30,688,000",
       "expected_verdict": "verified"
     }
   ]

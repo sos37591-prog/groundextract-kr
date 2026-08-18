@@ -1,0 +1,78 @@
+{
+  "doc_id": "gen_is_005",
+  "doc_type": "income_statement",
+  "full_text": "표준손익계산서\n(일반법인용)                                        (단위: 원)\n법인명 대현전자 주식회사\n사업자등록번호 746-97-47667\n2025년 01월 01일 부터 2025년 12월 31일 까지\n계 정 과 목 코드 금 액\nⅠ.매출액 001 436,791,000\n  상품매출 010 436,791,000\nⅡ.매출원가 035 171,350,000\nⅢ.매출총손익 066 265,441,000\nⅣ.판매비와관리비 067 43,108,000\n  소모품비 108 2,353,000\n  급여 068 33,104,000\n  지급수수료 104 7,651,000\nⅤ.영업손익 129 222,333,000\nⅥ.영업외수익 130 2,791,000\nⅦ.영업외비용 179 3,591,000\nⅧ.법인세비용차감전손익 217 221,533,000\nⅨ.법인세비용 218 44,294,000\nⅩ.당기순손익 219 177,239,000\n",
+  "injected_error": null,
+  "fields": [
+    {
+      "field": "revenue",
+      "raw": "436,791,000원",
+      "number": 436791000,
+      "grounding_quote": "Ⅰ.매출액 001 436,791,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "cogs",
+      "raw": "171,350,000원",
+      "number": 171350000,
+      "grounding_quote": "Ⅱ.매출원가 035 171,350,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "gross_profit",
+      "raw": "265,441,000원",
+      "number": 265441000,
+      "grounding_quote": "Ⅲ.매출총손익 066 265,441,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "sga",
+      "raw": "43,108,000원",
+      "number": 43108000,
+      "grounding_quote": "Ⅳ.판매비와관리비 067 43,108,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "operating_income",
+      "raw": "222,333,000원",
+      "number": 222333000,
+      "grounding_quote": "Ⅴ.영업손익 129 222,333,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_income",
+      "raw": "2,791,000원",
+      "number": 2791000,
+      "grounding_quote": "Ⅵ.영업외수익 130 2,791,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_expense",
+      "raw": "3,591,000원",
+      "number": 3591000,
+      "grounding_quote": "Ⅶ.영업외비용 179 3,591,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "pretax_income",
+      "raw": "221,533,000원",
+      "number": 221533000,
+      "grounding_quote": "Ⅷ.법인세비용차감전손익 217 221,533,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "income_tax_expense",
+      "raw": "44,294,000원",
+      "number": 44294000,
+      "grounding_quote": "Ⅸ.법인세비용 218 44,294,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "net_income",
+      "raw": "177,239,000원",
+      "number": 177239000,
+      "grounding_quote": "Ⅹ.당기순손익 219 177,239,000",
+      "expected_verdict": "verified"
+    }
+  ]
+}

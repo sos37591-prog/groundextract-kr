@@ -46,7 +46,13 @@ _RULES_DIR = default_rules_dir()
 #: input schema ``enum`` and the runtime check in :func:`_rule_pack_for`. A
 #: doc_type outside this list is rejected instead of quietly resolving to "no
 #: rule pack", which used to mean "nothing arithmetic ran".
-SUPPORTED_DOC_TYPES: tuple[str, ...] = ("tax_invoice", "statement", "balance_sheet")
+SUPPORTED_DOC_TYPES: tuple[str, ...] = (
+    "tax_invoice",
+    "statement",
+    "balance_sheet",
+    "income_statement",
+    "corporate_tax_return",
+)
 
 #: Hard limits for the stdio loop. One malformed or hostile line must never be
 #: able to take the server down (see :func:`main`).

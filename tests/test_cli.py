@@ -11,6 +11,9 @@ The bare command must keep running the demo, so the dispatch is tested too.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -162,3 +165,48 @@ def test_a_stray_file_argument_points_at_verify(capsys):
     with pytest.raises(SystemExit):
         main(["내문서.pdf"])
     assert "verify --doc" in capsys.readouterr().err
+
+
+# --- the report must survive the console it lands on ---------------------------
+
+
+def test_report_survives_a_console_that_cannot_encode_it(tmp_path):
+    """A cp949 console must get the verdicts, not a UnicodeEncodeError.
+
+    The self-vouching case — supply and vat both invented, total taken from the
+    document, so both invariants balance perfectly — is the one whose check
+    detail contains an em dash. On a Korean Windows console that raised
+    UnicodeEncodeError mid-report, so `verify` crashed on exactly the extraction
+    it exists to catch, and the resulting exit code 1 looked like an ordinary
+    failed verification rather than a crash.
+    """
+    doc = tmp_path / "doc.txt"
+    doc.write_text("전자세금계산서\n합계금액  2,200,000원\n", encoding="utf-8")
+    vals = tmp_path / "values.json"
+    vals.write_text(
+        json.dumps(
+            [
+                {"field": "supply", "raw": "2,000,000원"},
+                {"field": "vat", "raw": "200,000원"},
+                {"field": "total", "raw": "2,200,000원"},
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "groundextract", "verify",
+         "--doc", str(doc), "--values", str(vals), "--doc-type", "tax_invoice"],
+        capture_output=True,
+        text=True,
+        encoding="cp949",
+        errors="replace",
+        env={**os.environ, "PYTHONIOENCODING": "cp949"},
+    )
+
+    assert "Traceback" not in proc.stderr, proc.stderr
+    assert "UnicodeEncodeError" not in proc.stderr, proc.stderr
+    assert proc.returncode == 1                      # discards happened, as designed
+    assert '"discarded": 3' in proc.stdout           # and the whole report got out
+    assert "verifies nothing" in proc.stdout         # including the em-dash line

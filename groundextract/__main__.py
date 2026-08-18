@@ -208,8 +208,33 @@ def _print_report(
     print("summary:", json.dumps(summarize(fields, pack), ensure_ascii=False))
 
 
+def _survive_a_narrow_console() -> None:
+    """Never let an unencodable character turn a verdict into a traceback.
+
+    A check detail is free-form text — rule names, quoted document spans, the
+    gate's own prose — and the console it lands on is not. On a Korean Windows
+    console (cp949) the em dash in "this verifies nothing — the rule leans on …"
+    raised UnicodeEncodeError *while printing the report*, so `verify` crashed on
+    exactly the case it exists to catch: an extraction whose arithmetic passes
+    only because it leans on ungrounded values. The exit code was still 1, which
+    made it look like an ordinary failed verification rather than a crash.
+
+    Replacing unencodable characters degrades one glyph; raising loses the whole
+    report. `errors` is set without touching `encoding`, so console output stays
+    in the terminal's own codepage and Korean still renders.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(errors="replace")
+            except (ValueError, OSError):  # pragma: no cover - detached/odd stream
+                pass
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the demo, or dispatch to `verify`. Returns the process exit code."""
+    _survive_a_narrow_console()
     raw_args = list(sys.argv[1:] if argv is None else argv)
     if raw_args and raw_args[0] == "verify":
         return _verify_main(raw_args[1:])

@@ -1,45 +1,45 @@
 {
   "doc_id": "gen_tax_007",
   "doc_type": "tax_invoice",
-  "full_text": "전자세금계산서\n승인번호: 20260104-42138745-17774584\n작성일자: 2026-01-04\n공급자: (주)세정기업 (등록번호 346-82-20322)\n공급받는자: 청람테크 주식회사 (등록번호 187-72-19071)\n\n품목: 홈페이지 제작  공급가액 32,047,000원  세액 3,204,700원\n품목: 클라우드 이용료  공급가액 74,000원  세액 7,400원\n\n공급가액  32,121,000원\n세액  3,212,100원\n합계금액  35,333,100원\n",
+  "full_text": "전자세금계산서\n승인번호: 20260925-98550256-73791320\n작성일자: 2026-09-25\n공급자: 동성물산 주식회사 (등록번호 662-31-44741)\n공급받는자: (주)일송무역 (등록번호 640-87-65461)\n\n품목: 홈페이지 제작  공급가액 1,736,000원  세액 173,600원\n품목: 전산장비 납품  공급가액 2,899,000원  세액 289,900원\n\n공급가액  4,635,000원\n세액  463,500원\n합계금액  5,098,500원\n",
   "injected_error": {
     "kind": "ungrounded",
-    "field": "supply"
+    "field": "total"
   },
   "fields": [
     {
       "field": "supply",
-      "raw": "73,893,389원",
-      "number": 73893389,
-      "grounding_quote": "공급가액  73,893,389원",
-      "expected_verdict": "discarded"
+      "raw": "4,635,000원",
+      "number": 4635000,
+      "grounding_quote": "공급가액  4,635,000원",
+      "expected_verdict": "verified"
     },
     {
       "field": "vat",
-      "raw": "3,212,100원",
-      "number": 3212100,
-      "grounding_quote": "세액  3,212,100원",
+      "raw": "463,500원",
+      "number": 463500,
+      "grounding_quote": "세액  463,500원",
       "expected_verdict": "verified"
     },
     {
       "field": "total",
-      "raw": "35,333,100원",
-      "number": 35333100,
-      "grounding_quote": "합계금액  35,333,100원",
-      "expected_verdict": "verified"
+      "raw": "88,139,000원",
+      "number": 88139000,
+      "grounding_quote": "합계금액  88,139,000원",
+      "expected_verdict": "discarded"
     },
     {
       "field": "item1_supply",
-      "raw": "32,047,000원",
-      "number": 32047000,
-      "grounding_quote": "품목: 홈페이지 제작  공급가액 32,047,000원  세액 3,204,700원",
+      "raw": "1,736,000원",
+      "number": 1736000,
+      "grounding_quote": "품목: 홈페이지 제작  공급가액 1,736,000원  세액 173,600원",
       "expected_verdict": "verified"
     },
     {
       "field": "item2_supply",
-      "raw": "74,000원",
-      "number": 74000,
-      "grounding_quote": "품목: 클라우드 이용료  공급가액 74,000원  세액 7,400원",
+      "raw": "2,899,000원",
+      "number": 2899000,
+      "grounding_quote": "품목: 전산장비 납품  공급가액 2,899,000원  세액 289,900원",
       "expected_verdict": "verified"
     }
   ]

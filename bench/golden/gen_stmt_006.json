@@ -1,24 +1,24 @@
 {
   "doc_id": "gen_stmt_006",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n(주)세정기업  2026년 11월 22일 현재\n(단위: 원)\n\n계정과목  차변  대변\n미수금  차변 63,994,000원\n지급수수료  차변 7,051,000원\n외상매입금  대변 35,775,000원\n매출  대변 35,270,000원\n\n차변 합계  71,045,000원\n대변 합계  71,045,000원\n",
+  "full_text": "합계잔액시산표\n(주)세정기업  2026년 11월 22일 현재\n(단위: 원)\n\n계정과목  차변  대변\n미수금  차변 31,997,000원\n지급수수료  차변 23,424,000원\n외상매입금  대변 17,888,000원\n매출  대변 37,533,000원\n\n차변 합계  55,421,000원\n대변 합계  55,421,000원\n",
   "injected_error": {
-    "kind": "field-swap",
+    "kind": "ungrounded",
     "field": "credit_total"
   },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "71,045,000원",
-      "number": 71045000,
-      "grounding_quote": "차변 합계  71,045,000원",
+      "raw": "55,421,000원",
+      "number": 55421000,
+      "grounding_quote": "차변 합계  55,421,000원",
       "expected_verdict": "verified"
     },
     {
       "field": "credit_total",
-      "raw": "7,051,000원",
-      "number": 7051000,
-      "grounding_quote": "지급수수료  차변 7,051,000원",
+      "raw": "62,832,043원",
+      "number": 62832043,
+      "grounding_quote": "대변 합계  62,832,043원",
       "expected_verdict": "discarded"
     }
   ]

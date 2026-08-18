@@ -1,24 +1,24 @@
 {
   "doc_id": "gen_stmt_002",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n(주)세정기업  2026년 08월 20일 현재\n(단위: 원)\n\n계정과목  차변  대변\n보통예금  차변 6,583,000원\n미수금  차변 26,080,000원\n비품  차변 35,726,000원\n단기차입금  대변 59,830,000원\n선수금  대변 8,559,000원\n\n차변 합계  68,389,000원\n대변 합계  68,389,000원\n",
+  "full_text": "합계잔액시산표\n(주)누리상사  2026년 11월 17일 현재\n(단위: 원)\n\n계정과목  차변  대변\n지급수수료  차변 36,531,000원\n현금  차변 24,858,000원\n매출  대변 60,128,000원\n미지급금  대변 1,261,000원\n\n차변 합계  61,389,000원\n대변 합계  61,389,000원\n",
   "injected_error": {
-    "kind": "ungrounded",
+    "kind": "field-swap",
     "field": "credit_total"
   },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "68,389,000원",
-      "number": 68389000,
-      "grounding_quote": "차변 합계  68,389,000원",
+      "raw": "61,389,000원",
+      "number": 61389000,
+      "grounding_quote": "차변 합계  61,389,000원",
       "expected_verdict": "verified"
     },
     {
       "field": "credit_total",
-      "raw": "73,634,128원",
-      "number": 73634128,
-      "grounding_quote": "대변 합계  73,634,128원",
+      "raw": "1,261,000원",
+      "number": 1261000,
+      "grounding_quote": "미지급금  대변 1,261,000원",
       "expected_verdict": "discarded"
     }
   ]

@@ -45,10 +45,11 @@ def test_golden_set_loads():
     ids = [d.doc_id for d in docs]
     assert len(ids) == len(set(ids))  # doc_ids stay unique across gen_*/manual
     assert all(d.fields for d in docs)
-    assert all(d.doc_type in ("tax_invoice", "statement", "balance_sheet") for d in docs)
-    # every shipped rule pack is exercised — a pack the benchmark never runs is
-    # a pack whose regressions nobody would notice
-    assert {d.doc_type for d in docs} == {p.stem for p in RULES.glob("*.yaml")}
+    # every shipped rule pack is exercised, and nothing else is — a pack the
+    # benchmark never runs is a pack whose regressions nobody would notice, and a
+    # doc_type with no pack would be scored with no arithmetic behind it
+    shipped = {p.stem for p in RULES.glob("*.yaml")}
+    assert {d.doc_type for d in docs} == shipped
     assert m["total_fields"] == sum(len(d.fields) for d in docs)
 
 
@@ -165,3 +166,68 @@ def test_a_real_golden_set_still_reports_and_succeeds(capsys):
     out = capsys.readouterr().out
     assert "NumHall-KR benchmark" in out
     assert "json:" in out
+
+
+def test_published_numbers_match_the_measured_ones():
+    """The README tables and the demo page must not drift from the benchmark.
+
+    They already did: the live viewer shipped v0.1.1 figures (19.9% / 64.4% /
+    35.8%) for two releases while both READMEs quoted v0.1.2's, so the page the
+    README linked to as evidence contradicted it. These numbers are the public
+    contract (see CHANGELOG.md), and hand-copying them into four files is exactly
+    the kind of thing that goes stale quietly.
+    """
+    _, _, m = _bench()
+    pct = lambda v: f"{v * 100:.1f}%"  # noqa: E731 - same format the docs use
+    published = {
+        "grounded_accuracy": pct(m["grounded_accuracy"]),
+        "auto_discard_precision": pct(m["auto_discard_precision"]),
+        "auto_discard_recall": pct(m["auto_discard_recall"]),
+        "nhr_before": pct(m["numeric_hallucination_rate_before"]),
+    }
+    fields = str(m["total_fields"])
+
+    for name in ("README.md", "README.ko.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        for key, value in published.items():
+            assert value in text, f"{name} does not quote {key} = {value}"
+        assert fields in text, f"{name} does not quote total_fields = {fields}"
+
+    # The viewer hardcodes the same figures in its benchmark card; recall is
+    # rendered as "100%" there rather than "100.0%".
+    viewer = (ROOT / "viewer" / "index.html").read_text(encoding="utf-8")
+    for key in ("grounded_accuracy", "auto_discard_precision", "nhr_before"):
+        assert published[key] in viewer, f"viewer/index.html does not quote {key}"
+    assert fields in viewer
+
+
+def test_readme_signature_case_still_matches_the_golden_document():
+    """The README's worked example must be a document that actually exists.
+
+    Both READMEs quote a benchmark document by filename, with its figures and the
+    exact rule-violation lines, as *the* illustration of "only arithmetic sees
+    it". Regenerating the golden set reshuffles the seeded stream, so those
+    figures silently became someone else's document once already — the file the
+    READMEs named ended up with no injected error at all.
+    """
+    doc_id = "gen_tax_019"
+    payload = json.loads((GOLDEN / f"{doc_id}.json").read_text(encoding="utf-8"))
+    injected = payload["injected_error"]
+    assert injected == {"kind": "field-swap", "field": "vat"}, injected
+
+    by_field = {f["field"]: f for f in payload["fields"]}
+    vat, supply, total = by_field["vat"], by_field["supply"], by_field["total"]
+    # the swapped value really is printed in the document (grounding must pass)
+    assert vat["raw"] == supply["raw"]
+    assert vat["grounding_quote"] in payload["full_text"]
+
+    # and fault localization must still name vat alone, which is what the prose says
+    assert vat["expected_verdict"] == "discarded"
+    for survivor in ("supply", "total", "item1_supply", "item2_supply"):
+        assert by_field[survivor]["expected_verdict"] == "verified", survivor
+
+    for name in ("README.md", "README.ko.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        assert f"{doc_id}.json" in text, f"{name} names a different golden document"
+        for quoted in (vat["raw"], total["raw"], by_field["item1_supply"]["raw"]):
+            assert quoted in text, f"{name} does not quote {quoted}"

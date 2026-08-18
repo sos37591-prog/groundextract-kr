@@ -1,0 +1,81 @@
+{
+  "doc_id": "gen_is_002",
+  "doc_type": "income_statement",
+  "full_text": "표준손익계산서\n(일반법인용)                                        (단위: 원)\n법인명 (주)누리상사\n사업자등록번호 344-83-60196\n2024년 01월 01일 부터 2024년 12월 31일 까지\n계 정 과 목 코드 금 액\nⅠ.매출액 001 898,157,000\n  상품매출 010 898,157,000\nⅡ.매출원가 035 308,724,000\nⅢ.매출총손익 066 589,433,000\nⅣ.판매비와관리비 067 514,425,000\n  여비교통비 080 238,732,000\n  복리후생비 079 250,352,000\n  소모품비 108 25,341,000\nⅤ.영업손익 129 75,008,000\nⅥ.영업외수익 130 1,317,000\nⅦ.영업외비용 179 1,929,000\nⅧ.법인세비용차감전손익 217 74,396,000\nⅨ.법인세비용 218 8,924,000\nⅩ.당기순손익 219 65,472,000\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "sga"
+  },
+  "fields": [
+    {
+      "field": "revenue",
+      "raw": "898,157,000원",
+      "number": 898157000,
+      "grounding_quote": "Ⅰ.매출액 001 898,157,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "cogs",
+      "raw": "308,724,000원",
+      "number": 308724000,
+      "grounding_quote": "Ⅱ.매출원가 035 308,724,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "gross_profit",
+      "raw": "589,433,000원",
+      "number": 589433000,
+      "grounding_quote": "Ⅲ.매출총손익 066 589,433,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "sga",
+      "raw": "55,233,300원",
+      "number": 55233300,
+      "grounding_quote": "Ⅳ.판매비와관리비 067 55,233,300",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "operating_income",
+      "raw": "75,008,000원",
+      "number": 75008000,
+      "grounding_quote": "Ⅴ.영업손익 129 75,008,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_income",
+      "raw": "1,317,000원",
+      "number": 1317000,
+      "grounding_quote": "Ⅵ.영업외수익 130 1,317,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_expense",
+      "raw": "1,929,000원",
+      "number": 1929000,
+      "grounding_quote": "Ⅶ.영업외비용 179 1,929,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "pretax_income",
+      "raw": "74,396,000원",
+      "number": 74396000,
+      "grounding_quote": "Ⅷ.법인세비용차감전손익 217 74,396,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "income_tax_expense",
+      "raw": "8,924,000원",
+      "number": 8924000,
+      "grounding_quote": "Ⅸ.법인세비용 218 8,924,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "net_income",
+      "raw": "65,472,000원",
+      "number": 65472000,
+      "grounding_quote": "Ⅹ.당기순손익 219 65,472,000",
+      "expected_verdict": "verified"
+    }
+  ]
+}

@@ -90,6 +90,38 @@ FIELD_SPECS: dict[str, dict[str, str]] = {
         "total_equity": "자본총계",
         "total_liab_equity": "부채와자본총계 (부채총계 + 자본총계)",
     },
+    "income_statement": {
+        "revenue": "매출액 (Ⅰ, 코드 001)",
+        "cogs": "매출원가 (Ⅱ, 코드 035)",
+        "gross_profit": "매출총손익 (Ⅲ, 코드 066)",
+        "sga": "판매비와관리비 (Ⅳ, 코드 067)",
+        "operating_income": "영업손익 (Ⅴ, 코드 129)",
+        "non_operating_income": "영업외수익 (Ⅵ, 코드 130)",
+        "non_operating_expense": "영업외비용 (Ⅶ, 코드 179)",
+        "pretax_income": "법인세비용차감전손익 (Ⅷ, 코드 217)",
+        "income_tax_expense": "법인세비용 (Ⅸ, 코드 218)",
+        "net_income": "당기순손익 (Ⅹ, 코드 219)",
+    },
+    # 법인세 과세표준 및 세액조정계산서. The form prints a code number in front of
+    # every line, and that number — not the label — is what stays put across
+    # 사업연도, so the prompt asks for the code.
+    "corporate_tax_return": {
+        "net_income_per_books": "101 결산서상 당기순손익",
+        "gross_additions": "102 익금산입",
+        "gross_deductions": "103 손금산입",
+        "adjusted_income": "104 차가감소득금액",
+        "donation_excess": "105 기부금한도초과액",
+        "donation_carryover_deduction": "106 기부금한도초과이월액 손금산입",
+        "income_for_year": "107 각 사업연도 소득금액",
+        "loss_carryforward": "109 이월결손금",
+        "nontaxable_income": "110 비과세소득",
+        "income_deduction": "111 소득공제",
+        "taxable_income": "112 과세표준",
+        "tax_after_credits": "122 차감세액",
+        "credits_excluded_from_min_tax": "123 최저한세 적용제외 공제감면세액",
+        "additional_tax": "124 가산세액",
+        "tax_payable": "125 가감계",
+    },
 }
 
 _SYSTEM_PROMPT = (

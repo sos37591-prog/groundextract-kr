@@ -1,45 +1,42 @@
 {
   "doc_id": "gen_tax_010",
   "doc_type": "tax_invoice",
-  "full_text": "전자세금계산서\n승인번호: 20260603-47376585-99788677\n작성일자: 2026-06-03\n공급자: 대현전자 주식회사 (등록번호 597-37-80678)\n공급받는자: (주)가온소프트 (등록번호 235-83-85525)\n\n품목: 전산장비 납품  공급가액 1,937,000원  세액 193,700원\n품목: 보안 솔루션 공급  공급가액 221,000원  세액 22,100원\n\n공급가액  2,158,000원\n세액  215,800원\n합계금액  2,373,800원\n",
-  "injected_error": {
-    "kind": "ungrounded",
-    "field": "vat"
-  },
+  "full_text": "전자세금계산서\n승인번호: 20261019-73481353-64634663\n작성일자: 2026-10-19\n공급자: (주)누리상사 (등록번호 294-22-22704)\n공급받는자: (주)가온소프트 (등록번호 774-65-56438)\n\n품목: 네트워크 공사  공급가액 27,760,000원  세액 2,776,000원\n품목: 보안 솔루션 공급  공급가액 19,745,000원  세액 1,974,500원\n\n공급가액  47,505,000원\n세액  4,750,500원\n합계금액  52,255,500원\n",
+  "injected_error": null,
   "fields": [
     {
       "field": "supply",
-      "raw": "2,158,000원",
-      "number": 2158000,
-      "grounding_quote": "공급가액  2,158,000원",
+      "raw": "47,505,000원",
+      "number": 47505000,
+      "grounding_quote": "공급가액  47,505,000원",
       "expected_verdict": "verified"
     },
     {
       "field": "vat",
-      "raw": "12,804,000원",
-      "number": 12804000,
-      "grounding_quote": "세액  12,804,000원",
-      "expected_verdict": "discarded"
+      "raw": "4,750,500원",
+      "number": 4750500,
+      "grounding_quote": "세액  4,750,500원",
+      "expected_verdict": "verified"
     },
     {
       "field": "total",
-      "raw": "2,373,800원",
-      "number": 2373800,
-      "grounding_quote": "합계금액  2,373,800원",
+      "raw": "52,255,500원",
+      "number": 52255500,
+      "grounding_quote": "합계금액  52,255,500원",
       "expected_verdict": "verified"
     },
     {
       "field": "item1_supply",
-      "raw": "1,937,000원",
-      "number": 1937000,
-      "grounding_quote": "품목: 전산장비 납품  공급가액 1,937,000원  세액 193,700원",
+      "raw": "27,760,000원",
+      "number": 27760000,
+      "grounding_quote": "품목: 네트워크 공사  공급가액 27,760,000원  세액 2,776,000원",
       "expected_verdict": "verified"
     },
     {
       "field": "item2_supply",
-      "raw": "221,000원",
-      "number": 221000,
-      "grounding_quote": "품목: 보안 솔루션 공급  공급가액 221,000원  세액 22,100원",
+      "raw": "19,745,000원",
+      "number": 19745000,
+      "grounding_quote": "품목: 보안 솔루션 공급  공급가액 19,745,000원  세액 1,974,500원",
       "expected_verdict": "verified"
     }
   ]

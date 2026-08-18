@@ -1,52 +1,49 @@
 {
   "doc_id": "gen_bs_008",
   "doc_type": "balance_sheet",
-  "full_text": "표준재무상태표\n(주)미래유통  제20기  2026년 12월 31일 현재\n(단위: 원)\n\n[자산]\n  단기금융상품  7,586,000원\n  선급금  11,801,000원\n유동자산  19,387,000원\n  기계장치  1,167,000원\n  건물  6,272,000원\n  토지  2,201,000원\n비유동자산  9,640,000원\n자산총계  29,027,000원\n\n[부채와 자본]\n  매입채무  8,669,000원\n  미지급금  13,856,000원\n부채총계  22,525,000원\n  자본잉여금  3,483,000원\n  이익잉여금  3,019,000원\n자본총계  6,502,000원\n부채와자본총계  29,027,000원\n",
-  "injected_error": {
-    "kind": "ungrounded",
-    "field": "total_liabilities"
-  },
+  "full_text": "표준재무상태표\n(일반법인용)                                        (단위: 원)\n법인명 청람테크 주식회사\n사업자등록번호 193-70-55607\n2026년12월31일 현재\n계 정 과 목 코드 금 액\nⅠ.유동자산 001 5,571,000\n  현금 및 현금성자산 003 3,540,000\n  단기금융상품 005 2,031,000\nⅡ.비유동자산 080 24,269,000\n  기타비유동자산 194 8,205,000\n  보증금 217 11,578,000\n  유형자산 110 4,486,000\n자산총계(Ⅰ+Ⅱ) 228 29,840,000\nⅠ.유동부채 229\n  단기차입금 234 235,000\n  예수금 246 613,000\n부채총계(Ⅰ+Ⅱ) 333 848,000\n  이익잉여금 372 25,060,000\n  자본잉여금 337 3,932,000\n자본총계(Ⅲ+～Ⅶ) 382 28,992,000\n부채와 자본총계 383 29,840,000\n",
+  "injected_error": null,
   "fields": [
     {
       "field": "current_assets",
-      "raw": "19,387,000원",
-      "number": 19387000,
-      "grounding_quote": "유동자산  19,387,000원",
+      "raw": "5,571,000원",
+      "number": 5571000,
+      "grounding_quote": "Ⅰ.유동자산 001 5,571,000",
       "expected_verdict": "verified"
     },
     {
       "field": "noncurrent_assets",
-      "raw": "9,640,000원",
-      "number": 9640000,
-      "grounding_quote": "비유동자산  9,640,000원",
+      "raw": "24,269,000원",
+      "number": 24269000,
+      "grounding_quote": "Ⅱ.비유동자산 080 24,269,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_assets",
-      "raw": "29,027,000원",
-      "number": 29027000,
-      "grounding_quote": "자산총계  29,027,000원",
+      "raw": "29,840,000원",
+      "number": 29840000,
+      "grounding_quote": "자산총계(Ⅰ+Ⅱ) 228 29,840,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liabilities",
-      "raw": "90,366,000원",
-      "number": 90366000,
-      "grounding_quote": "부채총계  90,366,000원",
-      "expected_verdict": "discarded"
+      "raw": "848,000원",
+      "number": 848000,
+      "grounding_quote": "부채총계(Ⅰ+Ⅱ) 333 848,000",
+      "expected_verdict": "verified"
     },
     {
       "field": "total_equity",
-      "raw": "6,502,000원",
-      "number": 6502000,
-      "grounding_quote": "자본총계  6,502,000원",
+      "raw": "28,992,000원",
+      "number": 28992000,
+      "grounding_quote": "자본총계(Ⅲ+～Ⅶ) 382 28,992,000",
       "expected_verdict": "verified"
     },
     {
       "field": "total_liab_equity",
-      "raw": "29,027,000원",
-      "number": 29027000,
-      "grounding_quote": "부채와자본총계  29,027,000원",
+      "raw": "29,840,000원",
+      "number": 29840000,
+      "grounding_quote": "부채와 자본총계 383 29,840,000",
       "expected_verdict": "verified"
     }
   ]

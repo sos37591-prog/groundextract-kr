@@ -1,24 +1,24 @@
 {
   "doc_id": "gen_stmt_010",
   "doc_type": "statement",
-  "full_text": "합계잔액시산표\n청람테크 주식회사  2026년 02월 19일 현재\n(단위: 원)\n\n계정과목  차변  대변\n보통예금  차변 3,749,000원\n비품  차변 3,394,000원\n소모품비  차변 9,901,000원\n선수금  대변 8,397,000원\n외상매입금  대변 3,691,000원\n미지급금  대변 4,956,000원\n\n차변 합계  17,044,000원\n대변 합계  17,044,000원\n",
+  "full_text": "합계잔액시산표\n(주)가온소프트  2026년 02월 19일 현재\n(단위: 원)\n\n계정과목  차변  대변\n현금  차변 21,466,000원\n외상매출금  차변 58,449,000원\n단기차입금  대변 14,169,000원\n매출  대변 61,681,000원\n선수금  대변 4,065,000원\n\n차변 합계  79,915,000원\n대변 합계  79,915,000원\n",
   "injected_error": {
-    "kind": "ungrounded",
+    "kind": "field-swap",
     "field": "debit_total"
   },
   "fields": [
     {
       "field": "debit_total",
-      "raw": "77,382,128원",
-      "number": 77382128,
-      "grounding_quote": "차변 합계  77,382,128원",
+      "raw": "21,466,000원",
+      "number": 21466000,
+      "grounding_quote": "현금  차변 21,466,000원",
       "expected_verdict": "discarded"
     },
     {
       "field": "credit_total",
-      "raw": "17,044,000원",
-      "number": 17044000,
-      "grounding_quote": "대변 합계  17,044,000원",
+      "raw": "79,915,000원",
+      "number": 79915000,
+      "grounding_quote": "대변 합계  79,915,000원",
       "expected_verdict": "verified"
     }
   ]

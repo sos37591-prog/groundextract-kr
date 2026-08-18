@@ -1,7 +1,7 @@
 {
   "doc_id": "gen_tax_011",
   "doc_type": "tax_invoice",
-  "full_text": "전자세금계산서\n승인번호: 20260712-72682989-17270733\n작성일자: 2026-07-12\n공급자: 한결시스템 주식회사 (등록번호 789-93-94696)\n공급받는자: (주)일송무역 (등록번호 200-17-62772)\n\n품목: 데이터베이스 구축\n\n공급가액  43,287,000원\n세액  4,328,700원\n합계금액  47,615,700원\n",
+  "full_text": "전자세금계산서\n승인번호: 20260122-64038913-55540424\n작성일자: 2026-01-22\n공급자: (주)미래유통 (등록번호 919-23-42591)\n공급받는자: 주식회사 한빛상사 (등록번호 296-34-80292)\n\n품목: 보안 솔루션 공급\n\n공급가액  47,880,000원\n세액  4,788,000원\n합계금액  52,668,000원\n",
   "injected_error": {
     "kind": "field-swap",
     "field": "supply"
@@ -9,23 +9,23 @@
   "fields": [
     {
       "field": "supply",
-      "raw": "4,328,700원",
-      "number": 4328700,
-      "grounding_quote": "세액  4,328,700원",
+      "raw": "52,668,000원",
+      "number": 52668000,
+      "grounding_quote": "합계금액  52,668,000원",
       "expected_verdict": "discarded"
     },
     {
       "field": "vat",
-      "raw": "4,328,700원",
-      "number": 4328700,
-      "grounding_quote": "세액  4,328,700원",
+      "raw": "4,788,000원",
+      "number": 4788000,
+      "grounding_quote": "세액  4,788,000원",
       "expected_verdict": "verified"
     },
     {
       "field": "total",
-      "raw": "47,615,700원",
-      "number": 47615700,
-      "grounding_quote": "합계금액  47,615,700원",
+      "raw": "52,668,000원",
+      "number": 52668000,
+      "grounding_quote": "합계금액  52,668,000원",
       "expected_verdict": "verified"
     }
   ]

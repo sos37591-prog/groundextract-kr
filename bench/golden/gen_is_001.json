@@ -1,0 +1,81 @@
+{
+  "doc_id": "gen_is_001",
+  "doc_type": "income_statement",
+  "full_text": "표준손익계산서\n(일반법인용)                                        (단위: 원)\n법인명 (주)일송무역\n사업자등록번호 448-74-45018\n2026년 01월 01일 부터 2026년 12월 31일 까지\n계 정 과 목 코드 금 액\nⅠ.매출액 001 275,570,000\n  서비스매출 025 275,570,000\nⅡ.매출원가 035 120,743,000\nⅢ.매출총손익 066 154,827,000\nⅣ.판매비와관리비 067 145,510,000\n  여비교통비 080 18,301,000\n  지급수수료 104 127,209,000\nⅤ.영업손익 129 9,317,000\nⅥ.영업외수익 130 1,284,000\nⅦ.영업외비용 179 1,671,000\nⅧ.법인세비용차감전손익 217 8,930,000\nⅨ.법인세비용 218 490,000\nⅩ.당기순손익 219 8,440,000\n",
+  "injected_error": {
+    "kind": "ungrounded",
+    "field": "revenue"
+  },
+  "fields": [
+    {
+      "field": "revenue",
+      "raw": "39,232,000원",
+      "number": 39232000,
+      "grounding_quote": "Ⅰ.매출액 001 39,232,000",
+      "expected_verdict": "discarded"
+    },
+    {
+      "field": "cogs",
+      "raw": "120,743,000원",
+      "number": 120743000,
+      "grounding_quote": "Ⅱ.매출원가 035 120,743,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "gross_profit",
+      "raw": "154,827,000원",
+      "number": 154827000,
+      "grounding_quote": "Ⅲ.매출총손익 066 154,827,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "sga",
+      "raw": "145,510,000원",
+      "number": 145510000,
+      "grounding_quote": "Ⅳ.판매비와관리비 067 145,510,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "operating_income",
+      "raw": "9,317,000원",
+      "number": 9317000,
+      "grounding_quote": "Ⅴ.영업손익 129 9,317,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_income",
+      "raw": "1,284,000원",
+      "number": 1284000,
+      "grounding_quote": "Ⅵ.영업외수익 130 1,284,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "non_operating_expense",
+      "raw": "1,671,000원",
+      "number": 1671000,
+      "grounding_quote": "Ⅶ.영업외비용 179 1,671,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "pretax_income",
+      "raw": "8,930,000원",
+      "number": 8930000,
+      "grounding_quote": "Ⅷ.법인세비용차감전손익 217 8,930,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "income_tax_expense",
+      "raw": "490,000원",
+      "number": 490000,
+      "grounding_quote": "Ⅸ.법인세비용 218 490,000",
+      "expected_verdict": "verified"
+    },
+    {
+      "field": "net_income",
+      "raw": "8,440,000원",
+      "number": 8440000,
+      "grounding_quote": "Ⅹ.당기순손익 219 8,440,000",
+      "expected_verdict": "verified"
+    }
+  ]
+}
