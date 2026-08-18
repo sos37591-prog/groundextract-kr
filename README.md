@@ -11,11 +11,18 @@ python -m http.server 8931 --directory viewer
 #   → http://localhost:8931/index.html
 #   (file:// 직접 열기는 브라우저의 로컬 이미지 로드 제약이 있어 로컬 서버 권장)
 
-# 픽스처를 실 문서에서 다시 만들려면 (실제 run_gate를 돌려 생성):
-#   실 PDF 경로는 환경변수로 전달 — 원본 PDF는 커밋되지 않고, 마스킹된 PNG만 산출
-GEK_BALANCE_PDF="/path/to/재무제표.pdf" python viewer/build_combined_fixture.py
-#   → viewer/assets/*.png (기업 식별정보·바코드 마스킹) + viewer/fixtures/image_data.js
+# 픽스처 재생성 (실제 run_gate를 돌려 생성):
+python viewer/build_combined_fixture.py
+#   → viewer/assets/*.png + viewer/fixtures/image_data.js
 #     (window.GEK_DOCS = [전자세금계산서, 표준재무상태표])
+
+# 실 문서로 만들려면 환경변수로 경로를 전달한다. 원본 PDF는 커밋되지 않는다.
+GEK_BALANCE_PDF="/path/to/재무제표.pdf" python viewer/build_combined_fixture.py
+#   ⚠ 재무상태표 경로에는 마스킹 단계가 없다 — 커밋된 샘플이 합성이라 가릴 것이
+#     없기 때문이다. 따라서 실 PDF를 넘기면 렌더 결과는 추적 파일이 아니라
+#     gitignore된 local/balance_sheet_demo.png 로 나간다. 그 이미지에는 사업자
+#     등록번호·법인명·전 계정과목 금액이 그대로 있으니 공개 전에 직접 확인할 것.
+#     (마스킹이 실제로 적용되는 것은 세금계산서 경로의 승인번호뿐이다.)
 ```
 
 ## 화면 구성
