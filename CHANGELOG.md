@@ -11,6 +11,25 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
+### Fixed
+
+- **0.1.7 made a value plainly on the page come back ungrounded.** Its per-call charge
+  pushed the width-1 sweep past the per-value budget on documents from about 49 KiB up,
+  so the walk ran out before reaching the width the match actually lived at — and the
+  상호 was in the first line. Sizes 2 KiB through 32 KiB were unaffected, which is why
+  the test suite did not see it.
+
+  Ordering only affected speed while the walk always ran to completion; once it can
+  stop at a budget, it decides correctness. The value's own token count is tried first
+  now, then the neighbours, so the likeliest width is reached before any allowance runs
+  low. Pinned across five document sizes.
+
+- **"No grounding" was reported for a search that had simply been cut short.** A caller
+  reading that goes looking for a hallucination that is not there — the value may be in
+  the document, past the point the budget could afford to reach. The two cases now say
+  different things, and the truncated one says the value may still be present and to
+  cite a `grounding_quote` to check.
+
 ## [0.1.7] - 2026-08-18
 
 ### Security

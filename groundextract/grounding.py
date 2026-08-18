@@ -300,6 +300,11 @@ def _fuzzy_ratio(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+def _dedup(*widths: int) -> list[int]:
+    """Span widths in the order given, without repeats (``dict`` keeps order)."""
+    return list(dict.fromkeys(widths))
+
+
 class FuzzyBudget:
     """Fuzzy-matching work one request may spend, shared across its values.
 
@@ -323,7 +328,9 @@ class FuzzyBudget:
         return self.remaining >= 0
 
 
-def _best_fuzzy_ratio(v_norm: str, s_norm: str, budget: FuzzyBudget | None = None) -> float:
+def _best_fuzzy_ratio(
+    v_norm: str, s_norm: str, budget: FuzzyBudget | None = None
+) -> tuple[float, bool]:
     """Best ratio of the value against token-aligned spans of the source.
 
     The candidates a fuzzy comparison is scored against decide what the tier
@@ -348,7 +355,14 @@ def _best_fuzzy_ratio(v_norm: str, s_norm: str, budget: FuzzyBudget | None = Non
     # MAX_FUZZY_COMPARISON_CHARS for why predicting this cost does not work.
     # `mine` bounds this value; `budget` bounds the request it belongs to.
     mine = MAX_FUZZY_COMPARISON_CHARS
-    for width in sorted({max(wanted - 1, 1), wanted, wanted + 1}):
+    # The value's own token count first, then the neighbours. Ordering only
+    # affected speed while the walk always ran to completion; once it can stop at
+    # a budget it decides correctness. Sweeping ascending spent the whole
+    # allowance comparing a 2-token 상호 against single tokens, and a document
+    # past ~49 KiB ran out before reaching the width its match actually lived at
+    # — a value plainly on the page came back ungrounded. Most matches are at the
+    # width the value itself suggests, so look there first.
+    for width in _dedup(wanted, max(wanted - 1, 1), wanted + 1):
         for i in range(0, max(len(tokens) - width + 1, 1)):
             span = " ".join(tokens[i : i + width])
             # len(value) x len(span) is SequenceMatcher's worst case, plus the
@@ -358,13 +372,13 @@ def _best_fuzzy_ratio(v_norm: str, s_norm: str, budget: FuzzyBudget | None = Non
             cost = len(v_norm) * len(span) + FUZZY_CALL_OVERHEAD_CHARS
             mine -= cost
             if mine < 0:
-                return best
+                return best, True
             if budget is not None and not budget.spend(cost):
-                return best
+                return best, True
             best = max(best, _fuzzy_ratio(v_norm, span))
             if best >= FUZZY_THRESHOLD:
-                return best
-    return best
+                return best, False
+    return best, False
 
 
 def _occurs_standalone(needle: str, haystack: str) -> bool:
@@ -467,10 +481,22 @@ def match_value(
             f"({len(s_norm)} chars > {MAX_FUZZY_SOURCE_CHARS}); "
             "cite a grounding_quote to ground a textual value in a document this size",
         )
-    best = _best_fuzzy_ratio(v_norm, s_norm, budget)
+    best, cut_short = _best_fuzzy_ratio(v_norm, s_norm, budget)
     if best >= FUZZY_THRESHOLD:
         return MatchKind.FUZZY, f"fuzzy match ratio={best:.2f} (>= {FUZZY_THRESHOLD})"
 
+    if cut_short:
+        # Say which of the two happened. "no grounding" reads as "the document
+        # does not say this", and a caller who acts on that will go looking for a
+        # hallucination that is not there — the value may be on the page, past
+        # the point the search could afford to reach.
+        return (
+            MatchKind.NONE,
+            f"not grounded within the fuzzy search budget "
+            f"(best ratio={best:.2f} before the search was cut short); "
+            "the value may still be in the document — cite a grounding_quote to "
+            "check it directly",
+        )
     return MatchKind.NONE, f"no grounding (best fuzzy ratio={best:.2f})"
 
 

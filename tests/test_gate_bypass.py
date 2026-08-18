@@ -75,7 +75,12 @@ from groundextract import (
     match_value,
     run_gate,
 )
-from groundextract.grounding import MAX_FUZZY_SOURCE_CHARS, normalize_number_str
+from groundextract.grounding import (
+    MAX_FUZZY_REQUEST_CHARS,
+    MAX_FUZZY_SOURCE_CHARS,
+    FuzzyBudget,
+    normalize_number_str,
+)
 from groundextract.mcp_server import (
     MAX_FULL_TEXT_CHARS,
     MAX_TIMEOUT_SECONDS,
@@ -401,6 +406,55 @@ def test_a_full_request_is_bounded_not_just_each_value_in_it():
     assert len(fields) == MAX_VALUES
     assert all(f.verdict is Verdict.DISCARDED for f in fields)
     assert elapsed < 10.0, f"{elapsed:.2f}s for a full {MAX_VALUES}-value request"
+
+
+@pytest.mark.parametrize("doc_chars", [2048, 16384, 32768, 49152, MAX_FUZZY_SOURCE_CHARS])
+def test_ocr_noise_still_grounds_at_every_document_size(doc_chars):
+    """The regression a budget invites: a value plainly on the page, ungrounded.
+
+    Once the walk can stop early, the order it visits span widths in stops being
+    a matter of speed and starts deciding correctness. Sweeping ascending spent
+    the entire allowance comparing a two-token 상호 against single tokens, so a
+    document past ~49 KiB ran out before reaching the width the match actually
+    lived at — and the 상호 was right there in the first line. The value's own
+    token count is tried first now.
+    """
+    line = (
+        "전자세금계산서 공급자 주식회사 가온소프트 "
+        "공급받는자 주식회사 나래상사 품목 웹서비스 유지보수 "
+    )
+    doc = (line * (doc_chars // len(line) + 1))[:doc_chars]
+    kind, detail = match_value("주식회사 가온소프", doc)  # one character dropped
+    assert kind is MatchKind.FUZZY, f"{doc_chars} chars: {detail}"
+
+
+def test_running_out_of_budget_does_not_read_as_the_document_lacking_the_value():
+    # Fail-closed is right; saying the wrong thing about *why* is not. "no
+    # grounding" reads as "the document does not say this", and a caller acting
+    # on that goes hunting a hallucination that was never there.
+    tail = ("가나다 라마바 사아자 " * 3000)[:60000] + " 공급자 주식회사 특이상사 "
+    kind, detail = match_value("주식회사 특이상", tail)
+    assert kind is MatchKind.NONE
+    assert "cut short" in detail
+    assert "may still be in the document" in detail
+
+    # ...while a value genuinely absent still says so plainly.
+    line = "전자세금계산서 공급자 주식회사 가온소프트 "
+    kind, detail = match_value("주식회사 없는회사", (line * 200)[:8192])
+    assert kind is MatchKind.NONE
+    assert "cut short" not in detail
+
+
+def test_exact_matches_do_not_touch_the_shared_budget():
+    # The common case must not compete for it. A value that occurs verbatim
+    # returns before the fuzzy tier, so a hundred honest fields spend nothing and
+    # cannot starve each other.
+    line = "전자세금계산서 공급자 주식회사 가온소프트 공급받는자 주식회사 나래상사 "
+    doc = (line * (MAX_FUZZY_SOURCE_CHARS // len(line) + 1))[:MAX_FUZZY_SOURCE_CHARS]
+    budget = FuzzyBudget()
+    for i in range(100):
+        ground_value("주식회사 가온소프트" if i % 2 else "주식회사 나래상사", None, doc, budget)
+    assert budget.remaining == MAX_FUZZY_REQUEST_CHARS
 
 
 def test_an_honest_request_is_nowhere_near_the_request_budget():
