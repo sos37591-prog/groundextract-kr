@@ -30,7 +30,7 @@ from pathlib import Path
 
 from .gate import run_gate
 from .models import ExtractedValue, Verdict
-from .rules import RulePack, load_rule_pack
+from .rules import RulePack, default_rules_dir, load_rule_pack
 
 
 @dataclass
@@ -152,6 +152,19 @@ def main(argv: list[str] | None = None) -> int:
     directory reports 100% recall, 100% grounded-accuracy and a 0% hallucination
     rate — a flawless scorecard produced by measuring nothing. These numbers are
     published, so the failure mode has to be loud and the exit code non-zero.
+
+    Zero *rule packs* is the same failure wearing a better disguise, and it went
+    unguarded. The rules directory was resolved as "two levels up from this
+    file", which is the repository root in a checkout and ``site-packages`` in an
+    installed wheel — where no ``rules/`` exists, because the packs ship inside
+    the package. ``_rule_pack_for`` returns ``None`` for a missing pack rather
+    than raising, so ``pip install groundextract`` followed by the documented
+    command printed the two headline numbers *character-for-character* identical
+    to the repository run (13.4% -> 0.0%, recall 100.0%) with no arithmetic rule
+    applied at all — only precision moved, 57.8% -> 13.4%. Anyone reproducing the
+    published figures would have concluded they were inflated four-fold. So the
+    directory now comes from :func:`default_rules_dir`, the same resolver the
+    library itself uses, and a document type with no pack is a loud exit 2.
     """
     args = argv if argv is not None else sys.argv[1:]
     root = Path(__file__).resolve().parent.parent
@@ -170,7 +183,18 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    metrics = compute_metrics(run_bench(docs, root / "rules"))
+    rules_dir = default_rules_dir()
+    missing = sorted({d.doc_type for d in docs if not (rules_dir / f"{d.doc_type}.yaml").is_file()})
+    if missing:
+        print(
+            f"error: no rule pack in {rules_dir} for document type(s): {', '.join(missing)}\n"
+            "       without arithmetic rules these metrics measure grounding alone;\n"
+            "       refusing to report them as benchmark results.",
+            file=sys.stderr,
+        )
+        return 2
+
+    metrics = compute_metrics(run_bench(docs, rules_dir))
     if metrics["total_fields"] == 0:
         print(
             f"error: {len(docs)} golden document(s) in {golden_dir} carry no labeled "

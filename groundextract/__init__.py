@@ -17,7 +17,10 @@ from .models import (
 )
 from .rules import RulePack, default_rules_dir, evaluate_pack, load_rule_pack
 
-__version__ = "0.1.2"
+#: The one place the version is written. `pyproject.toml` declares it dynamic
+#: and reads it from here, so the built artifact and the code inside it cannot
+#: disagree again (`tests/test_packaging.py` holds that line).
+__version__ = "0.1.4"
 
 
 def available_doc_types() -> list[str]:
