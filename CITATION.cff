@@ -13,9 +13,9 @@ abstract: >-
   genuinely present in the document but attached to the wrong field. The decision
   is made by deterministic code, not by a second model, so it is reproducible and
   runs offline with no API key. The project ships NumHall-KR, a deterministic
-  regression suite of 46 documents and 146 labeled fields (40 synthetic from a
-  fixed-seed generator plus 6 hand-written), on which the gate reduces the numeric
-  hallucination rate from 19.9% to 0.0% at 100% auto-discard recall and 35.8%
+  regression suite of 72 documents and 388 labeled fields (64 synthetic from a
+  fixed-seed generator plus 8 hand-written), on which the gate reduces the numeric
+  hallucination rate from 13.4% to 0.0% at 100% auto-discard recall and 57.8%
   precision, and an MCP server so that agents consume only verified values.
 type: software
 authors:
@@ -23,8 +23,8 @@ authors:
     family-names: "Son"
   - given-names: "Hanna"
     family-names: "Hwang"
-version: "0.1.0"
-date-released: 2026-08-15
+version: "0.1.4"
+date-released: 2026-08-18
 license: Apache-2.0
 repository-code: "https://github.com/sos37591-prog/groundextract-kr"
 url: "https://github.com/sos37591-prog/groundextract-kr"

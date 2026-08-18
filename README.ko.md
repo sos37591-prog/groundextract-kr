@@ -241,7 +241,7 @@ Windows에서는 `C:\\path\\to\\venv\\Scripts\\python.exe`처럼 적습니다(JS
 | 툴 | 모델 필요? | 하는 일 |
 | --- | --- | --- |
 | `verify_extraction` | ❌ 결정적·무키·오프라인 | `full_text`·`doc_type`·이미 추출된 `values`를 받아 필드별 판정과 요약 반환 |
-| `extract_verified` | ✅ 로컬 Ollama | 로컬 오픈웨이트 모델로 추출한 뒤 동일 게이트 실행. Ollama 미가동 시 안내 담은 `isError` 결과 반환 |
+| `extract_verified` | ✅ Ollama (`OLLAMA_HOST`) | 오픈웨이트 모델로 추출한 뒤 동일 게이트 실행. Ollama 미가동 시 안내 담은 `isError` 결과 반환. **문서 원문이 `OLLAMA_HOST`로 전송됩니다** — [문서가 어디로 가는지](#실문서-파이프라인-옵션) 참조 |
 
 `doc_type`은 `tax_invoice` · `statement` · `balance_sheet` · `income_statement` ·
 `corporate_tax_return` 중 하나입니다. 에이전트 측
@@ -391,6 +391,18 @@ python -m http.server 8931 --directory viewer   # → http://localhost:8931/inde
 둘 다 **옵션 어댑터**입니다. 검증 경로 전체(데모·벤치·MCP `verify_extraction`·뷰어·테스트)는
 모델 없이, 키 없이, 네트워크 없이 동작합니다. 상용 API는 의존성이 아니며 기본 엔진은
 오픈웨이트입니다.
+
+> **문서가 어디로 가는지.** 추출 단계는 `OLLAMA_HOST` 환경변수가 가리키는 Ollama 서버로
+> **문서 원문 전체**를 전송합니다(기본값 `http://localhost:11434`). "오픈웨이트"는 라이선스
+> 속성이지 네트워크 속성이 아닙니다 — 셸·컨테이너·MCP 호스트에 이 변수가 이미 설정돼
+> 있다면(공용 GPU 서버, 원격 엔드포인트, 동료 PC 등) 세금계산서·재무제표가 그곳으로
+> 넘어갑니다. 민감한 문서에 이 단계를 돌리기 전에 값을 확인하십시오.
+>
+> ```bash
+> echo "$OLLAMA_HOST"      # 비어 있으면 localhost
+> ```
+>
+> 게이트 자체(`verify_extraction`·벤치·뷰어·테스트)는 소켓을 열지 않습니다.
 
 ---
 

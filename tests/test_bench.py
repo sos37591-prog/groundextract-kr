@@ -200,6 +200,21 @@ def test_published_numbers_match_the_measured_ones():
         assert published[key] in viewer, f"viewer/index.html does not quote {key}"
     assert fields in viewer
 
+    # CITATION.cff feeds Zenodo and GitHub's "Cite this repository", so a stale
+    # abstract fixes wrong figures in someone else's bibliography permanently. It
+    # sat two releases behind (46 documents, 146 fields, 19.9% -> 0.0%, 35.8%).
+    citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    for key in ("auto_discard_precision", "nhr_before"):
+        assert published[key] in citation, f"CITATION.cff does not quote {key}"
+    assert fields in citation, f"CITATION.cff does not quote total_fields = {fields}"
+
+    # The PR template hands contributors a `before` line. When it goes stale a
+    # precision *regression* reads as an improvement against it, and this section
+    # is the only benchmark review the project has.
+    template = (ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
+    for key, value in published.items():
+        assert value in template, f"PULL_REQUEST_TEMPLATE.md does not quote {key} = {value}"
+
 
 def test_readme_signature_case_still_matches_the_golden_document():
     """The README's worked example must be a document that actually exists.

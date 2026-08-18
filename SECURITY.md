@@ -101,8 +101,17 @@ We do not operate a bug bounty.
 - The deterministic path (grounding, rules, gate, `verify_extraction`, benchmark,
   viewer) makes **no network calls** and needs no credentials. If you see outbound
   traffic from that path, treat it as a security issue.
-- The optional `extract_verified` MCP tool talks to an Ollama server you configure
-  (`host` argument). Point it only at an endpoint you trust; document text is sent
-  to it.
+- **The optional `extract_verified` path sends your document to a model.** It talks
+  to the Ollama server named by the `OLLAMA_HOST` environment variable, defaulting
+  to `http://localhost:11434`, and the **full document text** goes into the prompt.
+  If `OLLAMA_HOST` is already set in your shell, container, or MCP host to a shared
+  GPU box or a colleague's endpoint, that is where the document goes — "open-weight"
+  and "local" are not the same guarantee, and the input here is real 세금계산서 and
+  재무제표. Check the variable before pointing this tool at anything confidential.
+- `host` is **deployment configuration, not a tool argument**. A caller-supplied
+  host would make the server a confused deputy — an agent could name any endpoint
+  and have the server post your documents to it — so a request carrying `host` is
+  rejected with `-32602` rather than honoured. Protect `OLLAMA_HOST` on the machine
+  running the server; that is the actual control point.
 - The runtime dependency surface is intentionally one package (PyYAML). CI generates
   a CycloneDX SBOM and fails on strong-copyleft licenses in the dependency tree.

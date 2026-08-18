@@ -34,15 +34,25 @@ Run `python -m groundextract.bench` if this touches `grounding.py`, `rules.py`,
 `gate.py`, the rule packs, or the golden set. Paste before/after — we track these
 numbers in the open, including when they get worse.
 
+Paste **your own** `before`, measured on the base branch — do not trust a number
+typed into this template. A stale baseline left here once made a precision *drop*
+read as an improvement, which is the one direction this section exists to catch.
+
 ```text
-before:  NHR 19.9% -> 0.0% | recall 100.0% | precision 35.8% | grounded-accuracy 64.4%
+before:  (run `python -m groundextract.bench` on the base branch and paste it here)
 after:
 ```
+
+For reference, `main` currently measures: `NHR 13.4% -> 0.0% | recall 100.0% |
+precision 57.8% | grounded-accuracy 90.2%` — if your `before` disagrees, say so
+rather than adjusting it.
 
 - [ ] No benchmark change (this PR cannot affect verdicts)
 - [ ] Numbers changed and are pasted above, with `CHANGELOG.md` updated
 - [ ] **`Auto-Discard Recall` is still 100.0%** — if not, explain below why letting a
       labeled bad value through is acceptable
+- [ ] `Auto-Discard Precision` and `Grounded-Accuracy` did not drop — if they did,
+      say why the trade is worth it
 
 ## Rule pack PRs only
 

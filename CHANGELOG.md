@@ -11,6 +11,77 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
+### Security
+
+- **A misassigned amount escaped the gate whenever the document spelled it with a
+  space or a dot.** The gate decided whether a value still owed arithmetic
+  verification by asking `normalize_number_str`, which returns `None` both for text
+  and for a string holding several number tokens. So `"1 000 000원"` and
+  `"1.000.000"` — ordinary OCR spellings of a Korean invoice figure — were filed as
+  *text*, the `rules_applied` requirement fell away, and values nothing had checked
+  came back `verified` at confidence 1.0. The identical misassignment spelled
+  `"1,000,000원"` was discarded, so the gate's answer depended on typography rather
+  than on the numbers. `carries_number` (any number token) is now the predicate, and
+  a value holding digits owes a rule however it is written. SECURITY.md classifies
+  this as the highest-severity class — "a formatting form that the parser reads as a
+  different number than a human reader would". Benchmark unchanged: every golden
+  field is a single token, so nothing in the published figures moves.
+
+- **Dates and identifiers no rule covers are now discarded, not verified.** Same root
+  cause, and the module docstring already promised this behaviour.
+
+- **The fuzzy tier's cap counted the wrong thing.** `MAX_FUZZY_SOURCE_CHARS` bounds
+  the source in characters, but the span search costs `source_tokens × value_tokens²`
+  — so a token-dense 64 KiB source against a value near `MAX_VALUE_CHARS` ran ~34s
+  for **one** value, and `MAX_VALUES` of them put a single well-formed request past
+  two hours on a loop that answers one caller at a time. The size test never caught
+  it because its source has no spaces, which collapses the search to one candidate.
+  `MAX_FUZZY_SEARCH_TOKENS` now budgets the product; real documents sit three orders
+  of magnitude inside it.
+
+- **`extract_verified` enforced no document cap**, so everything `MAX_LINE_CHARS`
+  allowed (4 MiB) went into the prompt, over the wire, and back through the gate —
+  strictly more work than `verify_extraction`, which *did* enforce the cap. Both
+  tools now share `MAX_FULL_TEXT_CHARS`, and a caller-supplied `timeout` is bounded
+  by `MAX_TIMEOUT_SECONDS`.
+
+### Fixed
+
+- **`python -m groundextract.bench` measured nothing when run from an installed
+  wheel.** It resolved rule packs as "two levels up from this file" — the repository
+  root in a checkout, `site-packages` once installed, where no `rules/` exists
+  because the packs ship *inside* the package. `_rule_pack_for` returns `None` rather
+  than raising, so `pip install groundextract` followed by the documented command
+  printed both headline numbers character-for-character identical to the repository
+  run (`13.4% -> 0.0%`, recall `100.0%`) with zero arithmetic rules applied, exit
+  code 0. Only precision moved: 57.8% → 13.4%. Anyone reproducing the published
+  figures would have concluded they were inflated four-fold. The bench now uses
+  `default_rules_dir()`, the resolver the library itself uses, and a document type
+  with no pack is a loud exit 2.
+
+- **The version was written in two files and 0.1.3 shipped disagreeing with itself**
+  (`Version: 0.1.3` in the metadata, `__version__ = "0.1.2"` in the code). SECURITY.md
+  asks a reporter for "the version you tested", so the package's own answer has to be
+  the true one. `pyproject.toml` now declares the version dynamic and hatchling reads
+  it from `groundextract/__init__.py`.
+
+- **`CITATION.cff` and the PR template carried v0.1.0-era figures.** The citation
+  metadata feeds Zenodo and GitHub's "Cite this repository", and the template's stale
+  `before` line made a precision *regression* read as an improvement against it. Both
+  are now covered by `test_published_numbers_match_the_measured_ones`.
+
+### Documentation
+
+- **Where your document actually goes.** `extract_verified` posts the full document
+  text to the server named by `OLLAMA_HOST`, and both READMEs said only "local
+  Ollama" — a licence property described as if it were a network one. If that
+  variable is already set to a shared GPU box or a remote endpoint, real 세금계산서
+  and 재무제표 go there. Now stated in both READMEs and SECURITY.md.
+
+- **SECURITY.md described a `host` tool argument that no longer exists** (removed as
+  a confused-deputy risk), which pointed readers away from `OLLAMA_HOST` — the actual
+  control point.
+
 ### Added
 
 - **Two rule packs covering the rest of a filed corporate return**: `income_statement`

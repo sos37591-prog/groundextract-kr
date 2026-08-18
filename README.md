@@ -253,7 +253,7 @@ straight from a source checkout instead? Add `"cwd": "/absolute/path/to/groundex
 | Tool | Needs a model? | What it does |
 | --- | --- | --- |
 | `verify_extraction` | ❌ deterministic, key-free, offline | Takes `full_text`, `doc_type`, and already-extracted `values`; returns per-field verdicts + summary. |
-| `extract_verified` | ✅ local Ollama | Extracts with a local open-weight model, then runs the same gate. Returns an `isError` result with guidance when Ollama is unreachable. |
+| `extract_verified` | ✅ Ollama (`OLLAMA_HOST`) | Extracts with an open-weight model, then runs the same gate. Returns an `isError` result with guidance when Ollama is unreachable. **Sends the document text to `OLLAMA_HOST`** — see [Where your document goes](#real-document-pipeline-optional). |
 
 `doc_type` is one of `tax_invoice`, `statement`, `balance_sheet`, `income_statement`, `corporate_tax_return`. A `verify_extraction`
 call returns the full audit trail — here, the same hallucinated VAT:
@@ -433,6 +433,19 @@ Example:
 Both are **optional adapters**. The entire verification path — demo, benchmark, MCP
 `verify_extraction`, viewer, tests — runs with no model, no key, and no network.
 Commercial APIs are deliberately not a dependency; the default engine is open-weight.
+
+> **Where your document goes.** The extraction stage posts the **full document text**
+> to the Ollama server named by `OLLAMA_HOST` (default `http://localhost:11434`).
+> "Open-weight" is a licence property, not a network one: if that variable is already
+> set in your shell, container, or MCP host — to a shared GPU box, a remote endpoint,
+> a colleague's machine — your 세금계산서 or 재무제표 goes there. Check it before
+> running this stage on anything confidential:
+>
+> ```bash
+> echo "$OLLAMA_HOST"      # empty means localhost
+> ```
+>
+> The gate itself (`verify_extraction`, benchmark, viewer, tests) never opens a socket.
 
 ---
 
