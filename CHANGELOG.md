@@ -11,6 +11,40 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-08-18
+
+### Security
+
+- **The work budget added in 0.1.4 did not bound the work.** It predicted the span
+  walk's cost as `source_tokens × value_tokens` and declined when the product was too
+  large. That metric is *anti-correlated* with the real cost: holding a value at 1024
+  characters and varying only how many spaces it contains, a 1-token value consumed
+  **0.096%** of the budget and ran **4.0s**, while a 64-token value consumed 6.2% —
+  64× more budget — and ran 2.5s. The shape that looked cheapest to the guard was the
+  most expensive to execute, so a single well-formed request still occupied the
+  single-threaded MCP server for tens of minutes (worst measured: 41s for one value,
+  ~175 minutes at `MAX_VALUES`) with every declared limit respected. The 0.1.4
+  regression test passed because it pinned the one shape the guard did catch.
+
+  `SequenceMatcher`'s cost is data-dependent — autojunk alone swings it by an order of
+  magnitude — and is not worth predicting. So `MAX_FUZZY_COMPARISON_CHARS` is not a
+  prediction: the walk decrements it by the actual size of each comparison and stops
+  when it runs out. That cannot be gamed by input shape, and the walk order is fixed
+  so the cut-off is deterministic. Stopping early returns what was found, which is the
+  fail-closed direction — a discarded field the caller can rescue with a
+  `grounding_quote`, never a false verification.
+
+  Worst crafted shape now measures **0.13s** per value (down from 41s, ~315× at
+  `MAX_VALUES`) and lands *below* what an honest miss on a full-size 64 KiB document
+  costs (0.14s) — there is no amplification left to buy. Tests parametrize the whole
+  family of source shapes rather than one point, and pin the no-amplification property
+  directly. Benchmark unchanged.
+
+## [0.1.4] - 2026-08-18
+
+Never published to PyPI; superseded by 0.1.5 the same day. Wheel and sdist are
+attached to the GitHub release.
+
 ### Security
 
 - **A misassigned amount escaped the gate whenever the document spelled it with a
@@ -31,13 +65,15 @@ Benchmark numbers are part of the public contract: any release that changes
   cause, and the module docstring already promised this behaviour.
 
 - **The fuzzy tier's cap counted the wrong thing.** `MAX_FUZZY_SOURCE_CHARS` bounds
-  the source in characters, but the span search costs `source_tokens × value_tokens²`
-  — so a token-dense 64 KiB source against a value near `MAX_VALUE_CHARS` ran ~34s
-  for **one** value, and `MAX_VALUES` of them put a single well-formed request past
-  two hours on a loop that answers one caller at a time. The size test never caught
-  it because its source has no spaces, which collapses the search to one candidate.
-  `MAX_FUZZY_SEARCH_TOKENS` now budgets the product; real documents sit three orders
-  of magnitude inside it.
+  the source in characters, but that is not what the span search costs — so a
+  token-dense 64 KiB source against a value near `MAX_VALUE_CHARS` ran ~34s for
+  **one** value, and `MAX_VALUES` of them put a single well-formed request past two
+  hours on a loop that answers one caller at a time. The size test never caught it
+  because its source has no spaces, which collapses the search to one candidate.
+  `MAX_FUZZY_SEARCH_TOKENS` budgets `source_tokens × value_tokens`.
+
+  **This did not work** — that product turned out to be anti-correlated with the real
+  cost, leaving the same request shape open. Fixed properly in 0.1.5; see above.
 
 - **`extract_verified` enforced no document cap**, so everything `MAX_LINE_CHARS`
   allowed (4 MiB) went into the prompt, over the wire, and back through the gate —
@@ -142,6 +178,28 @@ Benchmark numbers are part of the public contract: any release that changes
   single rule cannot localize — exactly the limitation already documented for `statement`,
   now visible in the headline number. Grounded-accuracy rose because those same forms are
   mostly correct fields the gate correctly keeps.
+
+## [0.1.3] - 2026-08-18
+
+Published to PyPI (wheel uploaded 08:31 UTC) and registered with the MCP registry.
+It was released without a tag or a changelog section of its own; both were added
+retroactively on the same day. Its changes are the Added/Changed entries under
+[0.1.4] above — the two rule packs covering a filed corporate return, and the
+five-form documentation — which had accumulated under `[Unreleased]` and were never
+promoted at release time.
+
+### Known defects
+
+Both fixed in [0.1.4]/[0.1.5]. If you installed this version, upgrade.
+
+- The gate bypass described under [0.1.5] and [0.1.4] is present: a misassigned
+  amount spelled with a space or dot separator comes back `verified` at confidence
+  1.0 having been checked by nothing.
+- The package declares `Version: 0.1.3` in its metadata but answers
+  `__version__ == "0.1.2"`. Cite the tag, not the constant, when reporting against
+  this release.
+- `python -m groundextract.bench` finds no rule packs when run from the installed
+  wheel and reports metrics computed without any arithmetic, exit code 0.
 
 ## [0.1.2] - 2026-08-16
 
@@ -422,5 +480,10 @@ table-cell bounding boxes; no unit scaling for 천원/백만원 statements;
 `balance_sheet` not yet represented in the benchmark. See
 [README.md](README.md#limitations).
 
-[Unreleased]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sos37591-prog/groundextract-kr/releases/tag/v0.1.0

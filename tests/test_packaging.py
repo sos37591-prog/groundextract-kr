@@ -51,6 +51,30 @@ def test_the_build_backend_reads_the_version_from_the_package():
     assert groundextract.__version__.count(".") == 2
 
 
+def test_every_file_that_states_a_version_states_the_same_one():
+    """The version appears in four places; nothing was checking they agreed.
+
+    They did not. 0.1.3 shipped with `Version: 0.1.3` in its metadata and
+    `__version__ == "0.1.2"` in its code, `CITATION.cff` still said 0.1.0 two
+    releases later, and `server.json` — the MCP registry entry that tells a
+    third party's agent which PyPI version to install — kept pointing at a
+    release with a known gate bypass. Each drifted silently because releasing is
+    a manual edit in several files.
+    """
+    version = groundextract.__version__
+
+    server = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
+    assert server["version"] == version, "server.json disagrees with the package"
+    for package in server.get("packages", []):
+        assert package["version"] == version, (
+            f"server.json points the registry at {package['identifier']} "
+            f"{package['version']} while this tree is {version}"
+        )
+
+    citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    assert f'version: "{version}"' in citation, "CITATION.cff disagrees with the package"
+
+
 def test_bench_resolves_rule_packs_the_way_the_library_does():
     """The bench must use the resolver that knows about installed layouts.
 

@@ -29,10 +29,13 @@ closes it:
    it against.
 7. **Unbounded work.** The fuzzy tier walks the source for every value, so one
    well-formed request could occupy the (single-threaded) MCP server for
-   minutes, starving every other caller on the pipe. The first cap counted
-   source *characters*, which is not what the search costs — a token-dense
-   source against a long value ran for hours while both inputs sat inside their
-   own limits, and ``extract_verified`` enforced no document cap at all.
+   minutes, starving every other caller on the pipe. Two caps failed here before
+   the third worked: counting source *characters* missed that cost is not linear
+   in them, and the replacement — predicting cost as source tokens x value
+   tokens — turned out to be *anti-correlated* with the real thing, so the shape
+   that looked cheapest ran longest. The walk now spends a budget it decrements
+   as it goes, which measures the work instead of guessing it.
+   ``extract_verified`` separately enforced no document cap at all.
 8. **Fragments as evidence.** A textual value grounded against any slice of the
    page, so a truncated 상호 or identifier counted as verbatim.
 9. **Spelling deciding the checks.** The gate asked ``normalize_number_str``
@@ -63,12 +66,7 @@ from groundextract import (
     match_value,
     run_gate,
 )
-from groundextract.grounding import (
-    MAX_FUZZY_SEARCH_TOKENS,
-    MAX_FUZZY_SOURCE_CHARS,
-    _fuzzy_search_tokens,
-    normalize_number_str,
-)
+from groundextract.grounding import MAX_FUZZY_SOURCE_CHARS, normalize_number_str
 from groundextract.mcp_server import (
     MAX_FULL_TEXT_CHARS,
     MAX_TIMEOUT_SECONDS,
@@ -324,6 +322,10 @@ def test_fuzzy_tier_declines_an_oversized_source():
 def test_worst_case_request_stays_fast():
     # MCP caps a request at MAX_VALUES fields over MAX_FULL_TEXT_CHARS of text.
     # That shape used to cost minutes; it must now be a fraction of a second.
+    #
+    # This source is *past* MAX_FUZZY_SOURCE_CHARS, so it is declined before the
+    # walk starts and measures only the size check. Kept because that path has to
+    # stay cheap too, but it is not the worst case — see below for that.
     source = "가나다라마바사아자차카타파하" * (MAX_FULL_TEXT_CHARS // 13)
     started = time.perf_counter()
     for i in range(MAX_VALUES):
@@ -331,31 +333,63 @@ def test_worst_case_request_stays_fast():
     assert time.perf_counter() - started < 5.0
 
 
-def test_a_token_dense_source_is_bounded_too():
-    # The test above walks a source with *no spaces*, which collapses the span
-    # search to a single candidate — so it passed while the search was still
-    # unbounded. The real worst case is a token-dense source against a long
-    # value: 32k spans, each as wide as the value. One such value cost ~34s
-    # measured, and MAX_VALUES of them put a single well-formed request over two
-    # hours, on a loop that answers one caller at a time.
-    source = ("가 " * (MAX_FUZZY_SOURCE_CHARS // 2))[:MAX_FUZZY_SOURCE_CHARS]
-    value = ("나 " * (MAX_VALUE_CHARS // 2))[:MAX_VALUE_CHARS]
+# Source shapes that sit *inside* every declared cap and still make the span walk
+# as expensive as it can be: a long value that never matches, against a source
+# tokenized finely enough to produce tens of thousands of spans. The first
+# attempt at a guard predicted cost as source_tokens x value_tokens, which is
+# anti-correlated with the real thing — the cheapest-looking of these shapes
+# (`1`, one value token) was the most expensive to run, at ~41s for a single
+# value. Parametrized because the guard has to hold across the whole family, not
+# at the one point a test happens to pick.
+@pytest.mark.parametrize("source_token_chars", [1, 2, 8, 16, 64, 128])
+def test_the_span_walk_is_bounded_whatever_the_token_shape(source_token_chars):
+    token = "가" * source_token_chars
+    source = " ".join([token] * (MAX_FUZZY_SOURCE_CHARS // (source_token_chars + 1)))
+    source = source[:MAX_FUZZY_SOURCE_CHARS]
+    value = ("나" * MAX_VALUE_CHARS)[:MAX_VALUE_CHARS]
+
     started = time.perf_counter()
-    kind, detail = match_value(value, source)
+    kind, _ = match_value(value, source)
     elapsed = time.perf_counter() - started
-    assert kind is MatchKind.NONE
-    assert "fuzzy search too large" in detail
-    assert elapsed < 1.0
+
+    assert kind is MatchKind.NONE  # fail-closed: never a false verify
+    # Budget: MAX_VALUES of these must stay inside a few seconds of wall clock,
+    # because the MCP stdio loop answers one caller at a time.
+    assert elapsed < 5.0 / MAX_VALUES * 16, f"{elapsed:.3f}s for one value"
 
 
-def test_a_realistic_document_is_nowhere_near_the_search_budget():
+def test_no_shape_buys_more_work_than_an_honest_large_document():
+    # The property that actually matters: an attacker must not be able to make
+    # the walk cost *more* than a legitimate request already does. If the worst
+    # crafted shape lands near an ordinary miss on a full-size document, there is
+    # no amplification left to exploit — and tightening further would start
+    # costing real documents their grounding.
+    line = "전자세금계산서 공급자 주식회사 가온소프트 공급받는자 주식회사 나래상사 "
+    # Fill the cap: comparing against a 2 KiB "large document" would compare the
+    # crafted input to nothing in particular.
+    honest = (line * (MAX_FUZZY_SOURCE_CHARS // len(line) + 1))[:MAX_FUZZY_SOURCE_CHARS]
+    started = time.perf_counter()
+    match_value("주식회사 없는상사", honest)
+    honest_cost = time.perf_counter() - started
+
+    hostile_source = (" ".join(["가"] * (MAX_FUZZY_SOURCE_CHARS // 2)))[:MAX_FUZZY_SOURCE_CHARS]
+    started = time.perf_counter()
+    match_value(("나" * MAX_VALUE_CHARS), hostile_source)
+    hostile_cost = time.perf_counter() - started
+
+    assert hostile_cost < honest_cost * 8, (
+        f"crafted input costs {hostile_cost:.3f}s vs {honest_cost:.3f}s for an honest miss"
+    )
+
+
+def test_a_realistic_document_still_grounds_after_the_budget():
     # The counterweight: the budget must not be so tight that ordinary Korean
-    # documents start failing to ground. A page of spaced text with a 상호-sized
-    # value has to stay well inside it and still match.
+    # documents start failing to ground. Exact, fuzzy-with-OCR-noise, and a
+    # genuine miss all have to keep behaving.
     source = "공급자 주식회사 가온소프트 서울특별시 강남구 " * 400
-    kind, _ = match_value("주식회사 가온소프트", source)
-    assert kind is MatchKind.EXACT
-    assert _fuzzy_search_tokens("주식회사 가온소프트", source) < MAX_FUZZY_SEARCH_TOKENS // 100
+    assert match_value("주식회사 가온소프트", source)[0] is MatchKind.EXACT
+    assert match_value("주식회사 가온소프", source)[0] is MatchKind.FUZZY
+    assert match_value("주식회사 없는회사", source)[0] is MatchKind.NONE
 
 
 def test_mcp_rejects_oversized_requests():

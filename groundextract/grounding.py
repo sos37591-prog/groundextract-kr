@@ -69,20 +69,36 @@ FUZZY_THRESHOLD = 0.87
 # false verification. Real regulatory documents are far below the limit.
 MAX_FUZZY_SOURCE_CHARS = 64 * 1024
 
-# ...and a second cap, because the char limit above does not actually bound the
-# search. The span walk runs once per source *token* and each comparison is
-# quadratic in the *value* length, so the cost is source_tokens x value_tokens^2
-# — not linear in source characters. A 64 KiB source of single-character tokens
-# is ~32k spans, and a value near MAX_VALUE_CHARS contributes hundreds more
-# tokens to every one of them; the product runs to hours while both inputs sit
-# comfortably under their own limits. The existing size test never caught it
-# because its source has no spaces at all, which collapses to a single span.
+# ...and a hard budget on the work itself, because a size limit does not bound it.
 #
-# Budgeting the product closes that gap. The limit is generous for real work: a
-# 64 KiB Korean document is on the order of 20k tokens and a 상호/품목 value is a
-# handful, so genuine requests land three orders of magnitude below it. Past the
-# budget the tier declines, which is the same fail-closed direction as above.
-MAX_FUZZY_SEARCH_TOKENS = 1 << 20
+# This is the second attempt. The first predicted the cost as source_tokens x
+# value_tokens and rejected the search when the product was too large. That
+# metric turned out to be *anti-correlated* with the real cost: holding a value
+# at 1024 characters and varying only how many spaces it contains, a 1-token
+# value consumed 0.096% of the budget and ran 4.0s, while a 64-token value
+# consumed 6.2% — 64x more budget — and ran 2.5s. So the shape that looked
+# cheapest to the guard was the most expensive to execute, and a single
+# well-formed request could still occupy the server for tens of minutes while
+# every declared limit was respected.
+#
+# The lesson is that SequenceMatcher's cost is data-dependent (autojunk alone
+# swings it by an order of magnitude) and not worth predicting. So this budget is
+# not a prediction: :func:`_best_fuzzy_ratio` decrements it by the actual
+# comparison size at every step and stops when it runs out. That cannot be gamed
+# by input shape, because it measures the work instead of guessing it, and the
+# walk order is fixed so the cut-off point is deterministic — the same request
+# always gets the same answer.
+#
+# Stopping early returns whatever the walk had found, so a match already located
+# still counts and a value that had not matched yet comes back ungrounded. That
+# is the fail-closed direction: the cost is a discarded field the caller can
+# rescue by citing a grounding_quote, never a false verification.
+#
+# The size: one comparison of an 11-character 상호 against a span costs ~11 x
+# span. A few-KiB Korean invoice — the documents this gate targets — walks in
+# well under 200k, so genuine work is an order of magnitude inside the budget,
+# while the worst shape measured above is cut off in milliseconds.
+MAX_FUZZY_COMPARISON_CHARS = 1_000_000
 
 # Characters that are noise around numbers in KR financial docs.
 _CURRENCY_UNITS = ("원", "₩", "KRW", "krw")
@@ -264,17 +280,6 @@ def _fuzzy_ratio(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
-def _fuzzy_search_tokens(v_norm: str, s_norm: str) -> int:
-    """Size of the span search :func:`_best_fuzzy_ratio` is about to run.
-
-    Source tokens x value tokens: the loop visits one span per source token and
-    each span is as wide as the value, so this is what the char caps miss. Counts
-    separators rather than splitting, so measuring the search stays cheaper than
-    performing it.
-    """
-    return (s_norm.count(" ") + 1) * (v_norm.count(" ") + 1)
-
-
 def _best_fuzzy_ratio(v_norm: str, s_norm: str) -> float:
     """Best ratio of the value against token-aligned spans of the source.
 
@@ -296,9 +301,21 @@ def _best_fuzzy_ratio(v_norm: str, s_norm: str) -> float:
     tokens = s_norm.split(" ")
     wanted = max(len(v_norm.split(" ")), 1)
     best = 0.0
+    # Spent as the walk proceeds rather than estimated in advance — see
+    # MAX_FUZZY_COMPARISON_CHARS for why predicting this cost does not work.
+    budget = MAX_FUZZY_COMPARISON_CHARS
     for width in sorted({max(wanted - 1, 1), wanted, wanted + 1}):
         for i in range(0, max(len(tokens) - width + 1, 1)):
             span = " ".join(tokens[i : i + width])
+            # len(value) x len(span) is SequenceMatcher's worst case. The +1 is
+            # not rounding: every call also pays a fixed cost proportional to the
+            # value alone (indexing it, walking it for matching blocks), which a
+            # bare product prices at nothing when the span is a character or two
+            # — precisely the shape a long value against a finely tokenized
+            # source produces, and the slowest one measured.
+            budget -= len(v_norm) * (len(span) + 1)
+            if budget < 0:
+                return best
             best = max(best, _fuzzy_ratio(v_norm, span))
             if best >= FUZZY_THRESHOLD:
                 return best
@@ -402,14 +419,6 @@ def match_value(value: str, source: str) -> tuple[MatchKind, str]:
             f"source too large for fuzzy matching "
             f"({len(s_norm)} chars > {MAX_FUZZY_SOURCE_CHARS}); "
             "cite a grounding_quote to ground a textual value in a document this size",
-        )
-    work = _fuzzy_search_tokens(v_norm, s_norm)
-    if work > MAX_FUZZY_SEARCH_TOKENS:
-        return (
-            MatchKind.NONE,
-            f"fuzzy search too large "
-            f"({work} span-tokens > {MAX_FUZZY_SEARCH_TOKENS}); "
-            "cite a grounding_quote to ground a textual value this long",
         )
     best = _best_fuzzy_ratio(v_norm, s_norm)
     if best >= FUZZY_THRESHOLD:
