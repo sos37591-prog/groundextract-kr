@@ -38,14 +38,14 @@ key, no network, no randomness — the same input always produces the same verdi
 ## 30-second quick start
 
 > [!WARNING]
-> **PyPI is currently a release behind, and the version it serves has a gate bypass.**
+> **PyPI still serves 0.1.3; the current release is 0.1.8, and every version up to and including 0.1.3 has a gate bypass.**
 > `pip install groundextract` gives you 0.1.3, in which a misassigned amount comes back
 > `verified` at confidence 1.0 whenever the document spells it with a space or a dot as
 > the thousands separator, or in 한글/한자 수사 — ordinary OCR output for Korean forms.
 > Until the upload lands, install the fixed release directly:
 >
 > ```bash
-> pip install "groundextract @ git+https://github.com/sos37591-prog/groundextract-kr@v0.1.7"
+> pip install "groundextract @ git+https://github.com/sos37591-prog/groundextract-kr@v0.1.8"
 > ```
 >
 > See the [release notes](https://github.com/sos37591-prog/groundextract-kr/releases/latest)
@@ -476,6 +476,28 @@ Read these before trusting the gate in production:
   More overlapping invariants in a rule pack means sharper localization; a pack with a
   single rule, like `statement`, cannot localize at all. Expect verified-only pipelines to
   send some correct values to human review.
+- **An error consistent across every rule that touches it is not caught — and is
+  reported `verified`.** This is the sharpest limit here, so read it before trusting
+  the verdict on a multi-column form. A rule that *passes* corroborates the fields it
+  names, and two values wrong **together** can satisfy it: read 공급가액 and 세액 both
+  an order of magnitude high and `세액 = 공급가액 × 10%` still holds, because the error
+  is proportional. Both misread values then come back `verified` at confidence 1.0,
+  and 합계금액 — the one figure read correctly — is discarded as the only remaining
+  explanation for the total not adding up.
+
+  ```text
+  supply  10,000,000원   ← misread    verified   1.0
+  vat      1,000,000원   ← misread    verified   1.0
+  total    1,100,000원                discarded  0.0
+  ```
+
+  A single wrong value is always caught (recall 100%). What defeats the gate is a
+  *coordinated* error, and the archetype is a 당기/전기 two-column form read one column
+  off. Refusing to corroborate across an overlapping rule would catch it and costs 17
+  points of precision (57.8% → 40.9%), which is not a trade this project makes for you.
+  **If your documents are multi-column, treat `verified` as "no invariant objected",
+  not as "a human need not look".** Multi-error benchmark coverage is v0.2 work — the
+  suite injects at most one error per document today, so this class is unmeasured.
 - **Table-cell bbox mapping is coarse.** Bounding boxes come from the PDF adapter at
   line/region granularity; individual cells inside a table are not precisely mapped, so
   viewer overlays on dense tables can be approximate.

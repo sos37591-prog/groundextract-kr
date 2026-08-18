@@ -11,6 +11,11 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-08-18
+
+Everything here came out of an independent re-audit of 0.1.7. **Upgrade from 0.1.7**:
+that release could report a 상호 plainly on the page as ungrounded.
+
 ### Fixed
 
 - **0.1.7 made a value plainly on the page come back ungrounded.** Its per-call charge
@@ -29,6 +34,64 @@ Benchmark numbers are part of the public contract: any release that changes
   the document, past the point the budget could afford to reach. The two cases now say
   different things, and the truncated one says the value may still be present and to
   cite a `grounding_quote` to check.
+
+- **A verdict depended on where its value sat in the request.** 0.1.7's request budget
+  was a pool values drew from as they were processed. Values *absent* from the document
+  are the expensive ones — nothing matches, so the walk runs to the end — and ten of them
+  ahead of a 상호 that was genuinely on the page drained the pool, so the real one came
+  back ungrounded; move it to the front of the same request and it verified. Array order
+  is a degree of freedom callers reasonably treat as meaningless, and "deterministic" was
+  being claimed while it decided verdicts.
+
+  There is no pool now. The allowance is divided evenly and each value gets the same
+  fixed share, so a value gets the same answer in every permutation while the request
+  total stays bounded. Pinned with forward/reversed/shuffled comparisons at six request
+  sizes — the suite had no permutation test at all, which is why this survived.
+
+  A large request buys each of its values less room; that is a real cost, but a uniform
+  and predictable one. Exact matches never reach the fuzzy tier, so a hundred honest
+  fields still cost nothing and cannot starve each other.
+
+### Changed
+
+- **`MAX_LOCALIZATION_CANDIDATES` raised 16 → 512.** It was sized for a combinatorial
+  search that 0.1.7 removed; the scan is linear now. It was also nearly binding —
+  `corporate_tax_return` references 15 fields, so one more rule would have switched fault
+  localization off for a whole document type with nothing in the output saying so.
+
+- **`FuzzyBudget`, `carries_number` and `pack_fields` are exported** from the package
+  root. The first appears in the public signatures of `match_value`/`ground_value`; the
+  other two are load-bearing for anyone writing a custom rule pack.
+
+- **The `rules_applied` message no longer claims a digit-free value "carries digits".**
+  A value spelled 일백만원 or 壹百萬 in a field a rule names now says the quantity has no
+  readable number, which is what actually blocked the check.
+
+### Documentation
+
+- **The limitation that a *coordinated* error is not caught is now stated in README
+  Limitations and SECURITY.md, with a worked example.** Read 공급가액 and 세액 both an
+  order of magnitude high and `세액 = 공급가액 × 10%` still holds, so both misread values
+  come back `verified` at confidence 1.0 while 합계금액, read correctly, is discarded.
+  0.1.7 fixed the case where the smallest explanation spans two fields; it does not
+  reach the case where a *passing* rule clears the guilty pair first.
+
+  Refusing to corroborate across an overlapping rule does catch it, and costs 17 points
+  of precision (57.8% → 40.9%) by discarding the corroborated siblings of every ordinary
+  single-field error — the exact cost fault localization exists to avoid. That trade
+  belongs to whoever runs this, so it is disclosed rather than made silently. A single
+  wrong value is still always caught.
+
+- The 0.1.3 mitigation dropped its "in a field your rule pack names" qualifier, which was
+  narrower than the actual exposure, and now gives a code snippet instead of prose. The
+  SECURITY.md version table names what is wrong with each release instead of marking
+  0.1.4–0.1.6 merely "superseded". The README warning says which version PyPI serves
+  rather than "a release behind", which was wrong by four.
+
+### Removed
+
+- `grep.exe.stackdump`, an msys crash dump swept into 0.1.7 by a `git add -A` and shipped
+  inside that release's sdist. `*.stackdump` is now in `.gitignore`.
 
 ## [0.1.7] - 2026-08-18
 
@@ -612,7 +675,8 @@ table-cell bounding boxes; no unit scaling for 천원/백만원 statements;
 `balance_sheet` not yet represented in the benchmark. See
 [README.md](README.md#limitations).
 
-[Unreleased]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/sos37591-prog/groundextract-kr/compare/v0.1.4...v0.1.5

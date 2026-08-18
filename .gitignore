@@ -71,3 +71,6 @@ CLAUDE.md
 # someone drops in must be excluded before it exists, not after.
 bench/sample_pdf/real_*
 local/
+
+# msys/cygwin crash dumps — one got committed and shipped inside an sdist.
+*.stackdump

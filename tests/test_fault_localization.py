@@ -24,9 +24,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from groundextract import ExtractedValue, Verdict, load_pack, run_gate
+from groundextract import (
+    ExtractedValue,
+    Verdict,
+    available_doc_types,
+    load_pack,
+    pack_fields,
+    run_gate,
+)
 from groundextract.bench import load_golden_dir, run_bench
-from groundextract.gate import _localize_fault
+from groundextract.gate import MAX_LOCALIZATION_CANDIDATES, _localize_fault
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -139,10 +146,19 @@ def test_localization_gives_up_rather_than_guess():
 
 
 def test_the_search_is_bounded():
-    # A pathological input must not turn the combinatorial search loose; past the
-    # ceiling it declines, which falls back to the conservative blame-everything.
-    wide = [{f"f{i}" for i in range(40)}]
+    # A pathological input must not turn the scan loose; past the ceiling it
+    # declines, which falls back to the conservative blame-everything.
+    #
+    # The ceiling used to be 16, sized for a combinatorial search that no longer
+    # exists — and `corporate_tax_return` already references 15 fields, so one
+    # more rule would have switched localization off for a whole document type
+    # with nothing in the output saying so. Anchored to the constant rather than
+    # a literal, so raising it again cannot leave this test asserting nothing.
+    wide = [{f"f{i}" for i in range(MAX_LOCALIZATION_CANDIDATES + 8)}]
     assert _localize_fault(wide, cleared=set()) is None
+    # ...and every shipped rule pack stays comfortably inside it.
+    for doc_type in available_doc_types():
+        assert len(pack_fields(load_pack(doc_type))) < MAX_LOCALIZATION_CANDIDATES
 
 
 # --- 3) the security boundary: a downgraded rule exonerates nobody -------------

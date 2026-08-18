@@ -11,23 +11,51 @@
 > Install the fixed release until the upload lands:
 >
 > ```bash
-> pip install "groundextract @ git+https://github.com/sos37591-prog/groundextract-kr@v0.1.7"
+> pip install "groundextract @ git+https://github.com/sos37591-prog/groundextract-kr@v0.1.8"
 > ```
 >
-> **Mitigation if you must stay on 0.1.3:** treat as unverified any value whose `raw`
-> either holds digits that do not spell one number, or spells a quantity with no ASCII
-> digits at all, in a field your rule pack names. Those were never actually checked.
+> **Mitigation if you must stay on 0.1.3:** treat as unverified any value that carries a
+> quantity your parser cannot read as one number — regardless of whether a rule names the
+> field. 0.1.3 required arithmetic only of values it could read as a single number, so
+> everything else skipped it:
+>
+> ```python
+> from groundextract.grounding import normalize_number_str, carries_number
+> unchecked = normalize_number_str(v.raw) is None and carries_number(v.raw)
+> ```
+>
+> `carries_number` does not exist in 0.1.3; use `any(c.isdigit() for c in v.raw)` there,
+> and treat 한글/한자 수사 (`일백만원`, `壹百萬`) as unchecked too — they carry no digit at
+> all and so were never even considered numeric.
 
 ## Supported versions
 
 The project is pre-1.0. Only the latest release line receives fixes; there are no
 backports to older tags.
 
-| Version | Supported |
-| --- | --- |
-| 0.1.7 | ✅ |
-| 0.1.4 – 0.1.6 | ⚠️ superseded, each by a security fix in the next |
-| ≤ 0.1.3 | ❌ known gate bypass — see above |
+| Version | Supported | Why |
+| --- | --- | --- |
+| 0.1.8 | ✅ | current |
+| 0.1.7 | ❌ | a 상호 plainly on the page came back ungrounded on documents past ~20 KB |
+| 0.1.6 | ❌ | fault localization certified misread values and discarded correct ones |
+| 0.1.4 – 0.1.5 | ❌ | gate bypass: 한글/한자 수사 misassignment verified at confidence 1.0 |
+| ≤ 0.1.3 | ❌ | gate bypass: space/dot thousands separators verified at confidence 1.0 |
+
+## Known limitation: a coordinated error is not caught
+
+The gate catches any **single** wrong value (recall 100% on the benchmark). It does not
+catch values that are wrong **together** in a way that still satisfies the invariants
+linking them — and in that case it reports them `verified` at confidence 1.0.
+
+Read 공급가액 and 세액 both an order of magnitude high and `세액 = 공급가액 × 10%` still
+holds, so both misread values verify while 합계금액, read correctly, is discarded as the
+only remaining explanation. The archetype is a 당기/전기 two-column form read one column
+off. Refusing to corroborate across an overlapping rule catches this and costs 17 points
+of precision (57.8% → 40.9%), so it is disclosed rather than paid for silently.
+
+**If your documents are multi-column, treat `verified` as "no invariant objected", not
+as "a human need not look".** This is not accepted as a vulnerability report on its own;
+a *single-value* error reaching `verified` is, and remains the most serious class here.
 
 ## What counts as a security issue here
 

@@ -84,16 +84,19 @@ _GATE_CHECKS = frozenset(
     }
 )
 
-#: Ceiling on the fault-localization search. A rule pack references a handful of
-#: fields, so the real search is tiny; this only stops a pathological input from
-#: turning the scan loose. Exceeding it means "cannot localize", which falls back
-#: to blaming every field the failing rules reference.
+#: Ceiling on the fault-localization search. Exceeding it means "cannot
+#: localize", which falls back to blaming every field the failing rules reference
+#: — safe, but a silent precision collapse for the pack that crosses the line.
 #:
-#: There is no longer a depth ceiling to go with it: explanations are accepted at
-#: size one only, because that is the only size the soundness argument in
-#: :func:`_localize_fault` covers. Searching sizes 2 and 3 inverted the verdict on
-#: a column-slipped 재무상태표.
-MAX_LOCALIZATION_CANDIDATES = 16
+#: It was 16, sized when the search enumerated combinations and its cost grew
+#: combinatorially. Explanations are accepted at size one now — the only size the
+#: soundness argument in :func:`_localize_fault` covers, and searching sizes 2
+#: and 3 inverted the verdict on a column-slipped 재무상태표 — so the scan is
+#: linear in the candidate count and 16 no longer buys anything. It was also
+#: nearly binding: ``corporate_tax_return`` already references 15 fields, so one
+#: more rule would have switched localization off for a whole document type with
+#: nothing in the output saying so.
+MAX_LOCALIZATION_CANDIDATES = 512
 
 
 def value_number(value: ExtractedValue) -> float | None:
@@ -298,7 +301,19 @@ def _vouching_check(check: Check, referenced: set[str], grounded: set[str]) -> C
 
 def _unverified_check(value: ExtractedValue, rule_pack: RulePack | None) -> Check:
     """Fail-closed check for a value carrying digits that no arithmetic reached."""
-    if value_number(value) is None:
+    if not value_carries_number(value):
+        # No digits at all, yet a rule names this field — the quantity is spelled
+        # 일백만원 / 壹百萬 / Ⅻ, or in an enclosed form stripped as notation. Saying
+        # "carries digits" here, as this branch used to, is simply false, and the
+        # reader needs to know it is the *notation* that blocked the check.
+        reason = (
+            f"raw {value.raw!r} spells its quantity without a readable number "
+            "(한글/한자 수사, Roman numerals, enclosed or superscript forms), "
+            f"so no rule in pack {rule_pack.doc_type!r} could evaluate it"
+            if rule_pack is not None
+            else f"raw {value.raw!r} spells its quantity without a readable number"
+        )
+    elif value_number(value) is None:
         # Digits are there but they do not spell one number ("1 000 000원",
         # "2026-06-27"). No rule could have been evaluated over it even had the
         # pack named the field, so name that rather than blaming the pack.
@@ -329,9 +344,12 @@ def run_gate(
     """Verify every extracted value and return per-field verdicts."""
     # Grounding runs first: which values are grounded decides which rule results
     # are allowed to vouch for a field (see :func:`_vouching_check`).
-    # One budget for the whole request. Per-value caps bound a value; only this
-    # bounds what a caller carrying MAX_VALUES of them can ask the server to do.
-    budget = FuzzyBudget()
+    # The request's fuzzy allowance, divided evenly. Per-value caps bound a
+    # value; only this bounds what a caller carrying MAX_VALUES of them can ask
+    # the server to do — and dividing it up front, rather than letting values
+    # draw from a shared pool, is what keeps a verdict from depending on where in
+    # the array its value happened to sit.
+    budget = FuzzyBudget(len(values))
     groundings = [ground_value(v.raw, v.grounding_quote, full_text, budget) for v in values]
     counts = Counter(v.field for v in values)
     grounded = {v.field for v, g in zip(values, groundings, strict=True) if g.passed}
@@ -368,6 +386,25 @@ def run_gate(
     # violation are blamed. `None` means the fault could not be narrowed, and the
     # conservative reading — every field the violated rules reference — stands.
     violations = [fields for c, fields, downgraded in vouched if not c.passed and not downgraded]
+    # KNOWN LIMIT, and the sharpest one in this file. A rule that passed clears
+    # the fields it names, including fields a *failed* rule also names — and where
+    # the two overlap, "this invariant holds" and "these values are wrong together
+    # in a way this invariant cannot see" are the same evidence.
+    #
+    # Read a 세금계산서's 공급가액 and 세액 both an order of magnitude high and
+    # `vat == supply x 10%` still passes, because the error is proportional. It
+    # clears both, and 합계금액 — the one figure read correctly — is left as the
+    # only explanation for the total being wrong. The two misread values verify at
+    # confidence 1.0 and the correct one is discarded.
+    #
+    # Restricting localization to single-field explanations (below) does not reach
+    # this: once the guilty pair is cleared, one innocent field really is the
+    # smallest explanation left. Refusing to clear on an overlapping rule does
+    # reach it, and costs 17 points of precision on the benchmark (57.8% -> 40.9%)
+    # by discarding the corroborated siblings of every ordinary single-field
+    # error — the exact cost fault localization exists to avoid. That trade is not
+    # this function's to make silently, so the limit is documented in README
+    # Limitations and SECURITY.md rather than paid for here.
     cleared = set().union(*[f for c, f, _ in vouched if c.passed]) if vouched else set()
     blamed = _localize_fault(violations, cleared)
     if blamed is None:

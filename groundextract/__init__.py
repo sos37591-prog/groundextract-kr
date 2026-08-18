@@ -6,7 +6,7 @@ auto-discarded at confidence 0 before it reaches downstream.
 """
 
 from .gate import run_gate, summarize
-from .grounding import ground_value, match_value
+from .grounding import FuzzyBudget, carries_number, ground_value, match_value
 from .models import (
     BBox,
     Check,
@@ -15,12 +15,12 @@ from .models import (
     Verdict,
     VerifiedField,
 )
-from .rules import RulePack, default_rules_dir, evaluate_pack, load_rule_pack
+from .rules import RulePack, default_rules_dir, evaluate_pack, load_rule_pack, pack_fields
 
 #: The one place the version is written. `pyproject.toml` declares it dynamic
 #: and reads it from here, so the built artifact and the code inside it cannot
 #: disagree again (`tests/test_packaging.py` holds that line).
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 
 
 def available_doc_types() -> list[str]:
@@ -63,8 +63,11 @@ __all__ = [
     "load_pack",
     "load_rule_pack",
     "evaluate_pack",
+    "FuzzyBudget",
+    "carries_number",
     "ground_value",
     "match_value",
+    "pack_fields",
     "run_gate",
     "summarize",
     "__version__",

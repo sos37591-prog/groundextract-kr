@@ -61,6 +61,7 @@ been bought with a gate that trusts nothing.
 
 from __future__ import annotations
 
+import random
 import time
 from pathlib import Path
 
@@ -76,6 +77,7 @@ from groundextract import (
     run_gate,
 )
 from groundextract.grounding import (
+    MAX_FUZZY_COMPARISON_CHARS,
     MAX_FUZZY_REQUEST_CHARS,
     MAX_FUZZY_SOURCE_CHARS,
     FuzzyBudget,
@@ -445,16 +447,63 @@ def test_running_out_of_budget_does_not_read_as_the_document_lacking_the_value()
     assert "cut short" not in detail
 
 
-def test_exact_matches_do_not_touch_the_shared_budget():
+@pytest.mark.parametrize("absent_ahead", [0, 6, 10, 16, 32, 64])
+def test_a_verdict_does_not_depend_on_where_the_value_sits_in_the_request(absent_ahead):
+    """Array order is not information, and it was deciding verdicts.
+
+    The first request-level bound was a pool every value drew from as it was
+    processed. Values absent from the document are the expensive ones — nothing
+    matches, so the walk runs to the end — and ten of them ahead of a 상호 that
+    was genuinely on the page drained the pool, so the real one came back
+    ungrounded. Move it to the front of the same request and it verified.
+
+    The allowance is divided up front now, so a value gets the same answer in
+    every permutation.
+    """
+    names = ["주식회사 너울시스템", "주식회사 가온소프트", "주식회사 나래상사"]
+    doc = ((" ".join(f"공급자 {n} 품목 유지보수" for n in names) + " ") * 60)[:8192]
+    syllables = "갑을병정무기경신임계자축인묘진사오미신유술해"
+
+    def absent(i: int) -> str:
+        # No digits: a digit-bearing value never reaches the fuzzy tier at all,
+        # which is how an earlier version of this probe measured nothing.
+        head = syllables[i % len(syllables)]
+        tail = syllables[(i * 7 + 3) % len(syllables)]
+        return f"주식회사 {head}{tail}상사"
+
+    values = [ExtractedValue(f"a{i}", absent(i), None, None) for i in range(absent_ahead)]
+    values.append(ExtractedValue("victim", "주식회사 너울시슥템", None, None))  # one OCR slip
+
+    def verdicts(ordered):
+        return {f.field: f.verdict for f in run_gate(ordered, doc, load_rule_pack(RULES))}
+
+    forward = verdicts(values)
+    assert forward["victim"] is Verdict.VERIFIED
+    assert verdicts(list(reversed(values))) == forward
+    shuffled = list(values)
+    random.Random(7).shuffle(shuffled)
+    assert verdicts(shuffled) == forward
+
+
+def test_exact_matches_leave_the_whole_allowance_for_everyone_else():
     # The common case must not compete for it. A value that occurs verbatim
-    # returns before the fuzzy tier, so a hundred honest fields spend nothing and
-    # cannot starve each other.
+    # returns before the fuzzy tier, so a hundred honest fields cost nothing and
+    # the share each value gets is untouched by its neighbours.
     line = "전자세금계산서 공급자 주식회사 가온소프트 공급받는자 주식회사 나래상사 "
     doc = (line * (MAX_FUZZY_SOURCE_CHARS // len(line) + 1))[:MAX_FUZZY_SOURCE_CHARS]
-    budget = FuzzyBudget()
-    for i in range(100):
-        ground_value("주식회사 가온소프트" if i % 2 else "주식회사 나래상사", None, doc, budget)
-    assert budget.remaining == MAX_FUZZY_REQUEST_CHARS
+    values = [
+        ExtractedValue(f"f{i}", "주식회사 가온소프트" if i % 2 else "주식회사 나래상사", None, None)
+        for i in range(100)
+    ]
+    fields = run_gate(values, doc, load_rule_pack(RULES))
+    assert all(f.verdict is Verdict.VERIFIED for f in fields)
+
+
+def test_the_share_is_the_same_for_every_value_and_sums_inside_the_request_cap():
+    for count in (1, 4, 50, MAX_VALUES):
+        budget = FuzzyBudget(count)
+        assert budget.allowance <= MAX_FUZZY_COMPARISON_CHARS
+        assert budget.allowance * count <= MAX_FUZZY_REQUEST_CHARS
 
 
 def test_an_honest_request_is_nowhere_near_the_request_budget():

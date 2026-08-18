@@ -114,11 +114,9 @@ FUZZY_CALL_OVERHEAD_CHARS = 96
 #: and a caller may send MAX_VALUES of them. Bounding each value in isolation
 #: bounds nothing about the request: 256 values, each legitimately inside its own
 #: allowance, still add up to minutes of CPU on a loop that answers one caller at
-#: a time. :func:`groundextract.gate.run_gate` opens one of these and every value
-#: spends from it, so what a request can ask for is bounded once rather than per
-#: field. Values arriving after it is exhausted skip the fuzzy tier and come back
-#: ungrounded — the same fail-closed direction as the per-value cut-off.
-MAX_FUZZY_REQUEST_CHARS = 4_000_000
+#: a time. :class:`FuzzyBudget` divides this evenly among a request's values —
+#: see there for why it is divided up front rather than drawn from as it goes.
+MAX_FUZZY_REQUEST_CHARS = 12_000_000
 
 # Characters that are noise around numbers in KR financial docs.
 _CURRENCY_UNITS = ("원", "₩", "KRW", "krw")
@@ -306,26 +304,38 @@ def _dedup(*widths: int) -> list[int]:
 
 
 class FuzzyBudget:
-    """Fuzzy-matching work one request may spend, shared across its values.
+    """How much span-walking each value in a request may do.
 
-    :data:`MAX_FUZZY_COMPARISON_CHARS` bounds a single value's span walk, which
-    bounds nothing about a request carrying ``MAX_VALUES`` of them — each one
-    comfortably inside its own allowance still summed to minutes of CPU on a loop
-    that answers one caller at a time. :func:`groundextract.gate.run_gate` opens
-    one budget and hands it to every value, so the request is bounded once.
+    :data:`MAX_FUZZY_COMPARISON_CHARS` bounds one value, which bounds nothing
+    about a request carrying ``MAX_VALUES`` of them: each sat inside its own
+    allowance and the total still ran to minutes on a loop that answers one
+    caller at a time.
 
-    Callers that ground a value on its own get a fresh budget and are unaffected.
+    The first attempt at a request bound was a shared pool that values drew from
+    as they were processed. It bounded the total correctly and broke something
+    more important — a value's verdict came to depend on **where in the array it
+    sat**. Ten values absent from the document, placed ahead of a 상호 that was
+    genuinely on the page, drained the pool and the real one came back
+    ungrounded; move it to the front of the same request and it verified. Array
+    order is a degree of freedom callers reasonably treat as meaningless, and
+    "deterministic" was being claimed while it decided verdicts.
+
+    So there is no pool. The request's allowance is divided evenly and each value
+    gets the same fixed share, computed once from the value count. Every value
+    then gets the same answer in any permutation, the total is still bounded by
+    ``value_count × share ≤ MAX_FUZZY_REQUEST_CHARS``, and there is no mutable
+    state to reason about. A large request buys each of its values less room —
+    which is a real cost, but a uniform and predictable one, and the matcher says
+    so explicitly rather than silently serving whoever arrived first.
     """
 
-    __slots__ = ("remaining",)
+    __slots__ = ("allowance",)
 
-    def __init__(self, total: int = MAX_FUZZY_REQUEST_CHARS) -> None:
-        self.remaining = total
-
-    def spend(self, cost: int) -> bool:
-        """Charge ``cost``; ``False`` once the request has run out."""
-        self.remaining -= cost
-        return self.remaining >= 0
+    def __init__(self, value_count: int = 1) -> None:
+        self.allowance = min(
+            MAX_FUZZY_COMPARISON_CHARS,
+            MAX_FUZZY_REQUEST_CHARS // max(value_count, 1),
+        )
 
 
 def _best_fuzzy_ratio(
@@ -354,7 +364,7 @@ def _best_fuzzy_ratio(
     # Spent as the walk proceeds rather than estimated in advance — see
     # MAX_FUZZY_COMPARISON_CHARS for why predicting this cost does not work.
     # `mine` bounds this value; `budget` bounds the request it belongs to.
-    mine = MAX_FUZZY_COMPARISON_CHARS
+    mine = budget.allowance if budget is not None else MAX_FUZZY_COMPARISON_CHARS
     # The value's own token count first, then the neighbours. Ordering only
     # affected speed while the walk always ran to completion; once it can stop at
     # a budget it decides correctness. Sweeping ascending spent the whole
@@ -372,8 +382,6 @@ def _best_fuzzy_ratio(
             cost = len(v_norm) * len(span) + FUZZY_CALL_OVERHEAD_CHARS
             mine -= cost
             if mine < 0:
-                return best, True
-            if budget is not None and not budget.spend(cost):
                 return best, True
             best = max(best, _fuzzy_ratio(v_norm, span))
             if best >= FUZZY_THRESHOLD:
