@@ -11,7 +11,66 @@ Benchmark numbers are part of the public contract: any release that changes
 
 ## [Unreleased]
 
-_Nothing yet. See the roadmap in [README.md](README.md#roadmap)._
+### Added
+
+- **Two rule packs covering the rest of a filed corporate return**: `income_statement`
+  (표준손익계산서) and `corporate_tax_return` (법인세 과세표준 및 세액조정계산서). With
+  `balance_sheet` they cover 재무상태표 · 손익계산서 · 세액조정계산서 — the three forms a
+  Korean company actually files together.
+
+  `corporate_tax_return` is the unusual one: 법인세법 시행규칙 [별지 제3호서식] prints its
+  own arithmetic beside each line — `(101＋102－103)`, `(122-123+124)` — so the pack
+  transcribes the document's formulas instead of encoding someone's domain knowledge.
+
+  One invariant is deliberately **not** encoded: `115 산출세액 = 과세표준 × 세율`. 법인세 is
+  a bracketed schedule (구간별 세율 + 누진공제), so the printed 세율(%) times 과세표준 only
+  equals 산출세액 for a single-bracket filer. A rule that is wrong for large filers destroys
+  their correct values as surely as a missing rule lets bad ones through, and fail-closed
+  does not make a wrong rule safe. A test pins the omission.
+
+  `income_statement` is a subtraction chain — each subtotal is a term of the next rule —
+  which is what makes it the best case for fault localization in the suite: a misread
+  판매비와관리비 is named **alone**, because every neighbour is corroborated by a rule that
+  passed.
+
+- **A regression test that the three doc_type surfaces agree.** A rule pack with no
+  `FIELD_SPECS` entry cannot be extracted for, a `FIELD_SPECS` entry with no pack produces
+  values the gate then discards for want of arithmetic, and either one missing from the MCP
+  enum is unreachable by an agent. The three had to be updated by hand and could drift
+  silently; now they cannot.
+
+### Changed
+
+- **The benchmark's synthetic 재무제표 documents now reproduce the filed layout** —
+  계정과목 / 코드 / 금액 columns, roman-numeral section headers, the form's real code
+  numbers, and no `원` in the amount column — instead of a prose approximation. The text
+  under test is now the shape an OCR pass over a real return produces, which also means
+  grounding is exercised at the PARTIAL_NUMERIC tier (the extractor emits `320,000,000원`
+  against a document that prints `320,000,000`) rather than as a substring hit.
+
+- **Benchmark numbers.** The suite grew from 58 documents / 218 fields to **72 / 388**:
+
+  | | before | after |
+  |---|---|---|
+  | Auto-Discard Recall | 100.0% | **100.0%** |
+  | Auto-Discard Precision | 59.2% | **57.8%** |
+  | Grounded-Accuracy | 86.7% | **90.2%** |
+  | Numeric Hallucination Rate (pre-gate) | 19.3% | **13.4%** |
+  | Numeric Hallucination Rate (post-gate) | 0.0% | **0.0%** |
+  | Confusion | TP=42 FP=29 FN=0 TN=147 | **TP=52 FP=38 FN=0 TN=298** |
+
+  The pre-gate rate fell because it is a property of the suite, not of the world: at most
+  one error is injected per document so a labeled fault is never ambiguous, and a 15-field
+  세액조정계산서 contributes fifteen fields against one possible error. The old cap spent
+  that shortfall by injecting into *every* document, which left no clean one — and a clean
+  document is the only case exercising "the gate must not discard anything", the
+  generator's own correctness check. `MAX_BAD_DOC_SHARE` now keeps a quarter of the
+  documents clean and the realised rate is reported rather than assumed.
+
+  Precision moved down 1.4pp: the wide forms add fields governed by a single rule, and a
+  single rule cannot localize — exactly the limitation already documented for `statement`,
+  now visible in the headline number. Grounded-accuracy rose because those same forms are
+  mostly correct fields the gate correctly keeps.
 
 ## [0.1.2] - 2026-08-16
 

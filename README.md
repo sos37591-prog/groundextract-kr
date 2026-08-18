@@ -7,9 +7,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Runtime deps: 1](https://img.shields.io/badge/runtime%20deps-1%20%28PyYAML%29-brightgreen.svg)](pyproject.toml)
 
-<!-- PyPI badge — uncomment after the first release is published to PyPI:
 [![PyPI](https://img.shields.io/pypi/v/groundextract.svg)](https://pypi.org/project/groundextract/)
--->
 
 > **[▶ Live demo](https://sos37591-prog.github.io/groundextract-kr/?doc=balance_sheet&injected=1)**
 > — opens with the *환각 주입* (hallucination injected) toggle already on: one digit of
@@ -38,12 +36,14 @@ key, no network, no randomness — the same input always produces the same verdi
 ## 30-second quick start
 
 ```bash
-git clone https://github.com/sos37591-prog/groundextract-kr.git
-cd groundextract-kr
-python -m pip install -e .     # Python 3.11+, exactly one runtime dep (PyYAML)
-python -m groundextract        # key-free demo, no network
-python -m groundextract --help # what the demo shows, and where to go next
+python -m pip install groundextract   # Python 3.11+, exactly one runtime dep (PyYAML)
+python -m groundextract               # key-free demo, no network
+python -m groundextract --help        # what the demo shows, and where to go next
 ```
+
+Working from a checkout instead? `git clone https://github.com/sos37591-prog/groundextract-kr.git
+&& cd groundextract-kr && python -m pip install -e .` gives you the same thing plus the
+benchmark and fixtures.
 
 Prefer a container? `docker build -t groundextract-kr . && docker run --rm groundextract-kr`
 runs the same demo — see [Run in Docker](#run-in-docker).
@@ -125,28 +125,34 @@ Grounding and arithmetic catch **disjoint classes of error**. Neither is suffici
 ### The signature case: only arithmetic sees it
 
 This is an actual document from the benchmark suite
-(`bench/golden/gen_tax_001.json` — synthetic, fixed seed). The extractor filled `vat`
-with `5,230,000원` — a number that **is** printed in the document, on a line-item row,
-and it cited that exact span:
+(`bench/golden/gen_tax_019.json` — synthetic, fixed seed). The extractor filled `vat`
+with `17,432,000원` — the 공급가액 figure, one line up. That number **is** printed in the
+document, and the model cited the exact line it came from:
 
 ```text
-품목: 전산장비 납품    공급가액 5,230,000원   세액 523,000원    ← the cited span, verbatim
-품목: 시스템 유지보수  공급가액 31,048,000원  세액 3,104,800원
+품목: 홈페이지 제작      공급가액 8,651,000원   세액 865,100원
+품목: 보안 솔루션 공급   공급가액 8,781,000원   세액 878,100원
 
-공급가액  36,278,000원
-세액  3,627,800원          ← the correct value the extractor should have taken
-합계금액  39,905,800원
+공급가액  17,432,000원    ← the cited span, verbatim — and the wrong field
+세액  1,743,200원         ← the value the extractor should have taken
+합계금액  19,175,200원
 ```
 
 Verbatim grounding **passes** — the quote is genuinely in the text, character for
-character. Only `vat = supply × 10%` exposes it:
+character. Only the arithmetic exposes it:
 
 ```text
-! vat_equals_supply_x_10pct: 5,230,000 vs 3,627,800 (tol 1) -> diff 1,602,200
+! vat_equals_supply_x_10pct:   17,432,000 vs  1,743,200 (tol 1) -> diff 15,688,800
+! total_equals_supply_plus_vat: 19,175,200 vs 34,864,000 (tol 1) -> diff 15,688,800
 ```
 
 A grounding-only tool (bbox / span citation) would ship this number to your ledger with a
 green checkmark and a highlighted box pointing at the "evidence".
+
+Both invariants break, and `vat` is the only field they both name that a passing rule does
+not vouch for — so `supply`, `total` and both line items stay **verified** and `vat` alone
+is discarded. That is [fault localization](#benchmark-numhall-kr) doing its job on a real
+benchmark document.
 
 The mirror case holds too: a fabricated number in a field that no invariant constrains —
 or where the invariant's other operands were never extracted, so it is skipped rather
@@ -195,7 +201,7 @@ for f in run_gate(values, doc, pack):
 
 `load_pack(doc_type)` finds the packs that ship *inside* the package, so it works from any
 working directory and from a `pip install`ed wheel — no repository checkout required.
-`available_doc_types()` lists what ships (`tax_invoice`, `statement`, `balance_sheet`) and
+`available_doc_types()` lists what ships (`tax_invoice`, `statement`, `balance_sheet`, `income_statement`, `corporate_tax_return`) and
 `default_rules_dir()` returns where they live. For a pack of your own, keep using
 `load_rule_pack("path/to/my_doc_type.yaml")`.
 
@@ -247,7 +253,7 @@ straight from a source checkout instead? Add `"cwd": "/absolute/path/to/groundex
 | `verify_extraction` | ❌ deterministic, key-free, offline | Takes `full_text`, `doc_type`, and already-extracted `values`; returns per-field verdicts + summary. |
 | `extract_verified` | ✅ local Ollama | Extracts with a local open-weight model, then runs the same gate. Returns an `isError` result with guidance when Ollama is unreachable. |
 
-`doc_type` is one of `tax_invoice`, `statement`, `balance_sheet`. A `verify_extraction`
+`doc_type` is one of `tax_invoice`, `statement`, `balance_sheet`, `income_statement`, `corporate_tax_return`. A `verify_extraction`
 call returns the full audit trail — here, the same hallucinated VAT:
 
 ```json
@@ -297,8 +303,15 @@ rules:
 
 Shipped packs: `tax_invoice` (VAT / total / line-item sum), `statement`
 (debit total = credit total), `balance_sheet` (assets = liabilities + equity, and the two
-subtotal identities). `tol` is expressed in the value's own unit (KRW), so a 1-won
-rounding slack is normal.
+subtotal identities), `income_statement` (the 매출 → 당기순손익 subtraction chain), and
+`corporate_tax_return` (법인세 과세표준 및 세액조정계산서 — the form prints its own
+formulas, `(101＋102－103)`, so the pack transcribes rather than infers them). `tol` is
+expressed in the value's own unit (KRW), so a 1-won rounding slack is normal.
+
+Together the last three cover a whole filed return, and the interesting invariants are the
+ones that cross forms: 당기순손익 on the income statement is 이익잉여금 on the balance sheet
+and line 101 on the tax return. Cross-form rules are not shipped yet — a pack scopes to one
+document — but the field names are aligned so a pack can express them.
 
 Adding a new document type means writing one YAML file and registering the type in three
 places — see [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-rule-pack-new-document-type).
@@ -313,20 +326,26 @@ python -m groundextract.bench
 
 ```text
 === NumHall-KR benchmark ===
-fields: 218  (ground-truth bad: 42)
-confusion: TP=42 FP=29 FN=0 TN=147
-Numeric Hallucination Rate: 19.3% (before gate)  ->  0.0% (after gate)
-Grounded-Accuracy:          86.7%
-Auto-Discard Precision:     59.2%
+fields: 388  (ground-truth bad: 52)
+confusion: TP=52 FP=38 FN=0 TN=298
+Numeric Hallucination Rate: 13.4% (before gate)  ->  0.0% (after gate)
+Grounded-Accuracy:          90.2%
+Auto-Discard Precision:     57.8%
 Auto-Discard Recall:        100.0%
 ```
 
 | Metric | Value | Reading |
 | --- | --- | --- |
-| Numeric Hallucination Rate | **19.3% → 0.0%** | Zero bad numbers survive the gate. |
-| Auto-Discard Recall | **100.0%** | All 42 labeled bad fields were discarded (FN = 0). |
-| Auto-Discard Precision | **59.2%** | 29 good fields were discarded alongside them. |
-| Grounded-Accuracy | **86.7%** | Share of all 218 fields that end up correctly verified. |
+| Numeric Hallucination Rate | **13.4% → 0.0%** | Zero bad numbers survive the gate. |
+| Auto-Discard Recall | **100.0%** | All 52 labeled bad fields were discarded (FN = 0). |
+| Auto-Discard Precision | **57.8%** | 38 good fields were discarded alongside them. |
+| Grounded-Accuracy | **90.2%** | Share of all 388 fields that end up correctly verified. |
+
+The pre-gate rate is a property of the suite, not of the world: at most one error is
+injected per document so a labeled fault is never ambiguous, which caps the achievable
+field-level rate as wider forms join the set. It fell from 19.3% to 13.4% when the
+ten-field 손익계산서 and fifteen-field 세액조정계산서 arrived. The post-gate figure —
+the one that is a claim about the gate — is unchanged at 0.0%.
 
 **We publish the unflattering numbers on purpose.** The objective function here is *not*
 accuracy — it is **zero leakage**: no fabricated number may reach a downstream ledger,
@@ -337,15 +356,22 @@ indicts only some of them, so the gate sets aside any field a *passing* rule cor
 then blames the smallest sets of the rest that account for every violation. Because a
 single wrong value must appear in every rule that broke, `{that value}` is always among
 those minimum explanations — so blaming their union cannot lose it. Recall stays at 100%
-while precision went 35.8% → **59.2%** and grounded-accuracy 64.4% → **86.7%** on a
-benchmark that also grew by a third. What remains is genuine ambiguity: when two fields
-explain the failures equally well, both go.
+while precision went 35.8% → **57.8%** and grounded-accuracy 64.4% → **90.2%**. What
+remains is genuine ambiguity: when two fields explain the failures equally well, both go.
+
+Depth of coverage decides how much can be localized. On the 표준손익계산서 — a subtraction
+chain where each subtotal is a term of the next rule — a misread 판매비와관리비 is named
+**alone**, because every neighbour is corroborated by a rule that passed. On a single-rule
+pack like `statement` nothing can be narrowed at all.
 
 ### What NumHall-KR is, and what it is not
 
-- **It is** a deterministic, reproducible **regression suite**: 58 documents / 218 labeled
-  fields = **50 synthetic** (30 tax invoices + 10 trial balances + 10 balance sheets,
-  fixed-seed generator) + **8 hand-written** documents. Every shipped rule pack is
+- **It is** a deterministic, reproducible **regression suite**: 72 documents / 388 labeled
+  fields = **64 synthetic** (30 tax invoices + 10 trial balances + 10 balance sheets +
+  8 income statements + 6 corporate tax returns, fixed-seed generator) + **8 hand-written**
+  documents. The 재무제표 and 법인세 forms reproduce the filed layout — 계정과목 / 코드 /
+  금액 columns, roman-numeral section headers, no 원 suffix in the amount column — so the
+  text under test is what an OCR pass over a real return produces. Every shipped rule pack is
   exercised — a pack the benchmark never runs is a pack whose regressions nobody notices,
   and a test asserts the two sets stay in step. Every injected error is labeled by kind
   (`ungrounded` — the number exists nowhere; `field-swap` — the number exists but belongs
@@ -355,7 +381,8 @@ explain the failures equally well, both go.
   disagree with it:
 
   ```bash
-  python bench/generate_golden.py --count-tax 30 --count-stmt 10 --seed 42
+  python bench/generate_golden.py --count-tax 30 --count-stmt 10 --count-balance 10 \
+      --count-income 8 --count-taxreturn 6 --seed 42
   ```
 
   Every candidate document is validated through the real gate before being written, and a
@@ -416,7 +443,7 @@ Read these before trusting the gate in production:
   aggregates are out of scope.
 - **Ambiguity still over-discards.** Fault localization narrows a violation to the smallest
   sets of fields that explain it, but when two fields explain it equally well — 세액 vs
-  공급가액 with no line items to break the tie — both are discarded (Precision 59.2%).
+  공급가액 with no line items to break the tie — both are discarded (Precision 57.8%).
   More overlapping invariants in a rule pack means sharper localization; a pack with a
   single rule, like `statement`, cannot localize at all. Expect verified-only pipelines to
   send some correct values to human review.
@@ -449,8 +476,8 @@ Read these before trusting the gate in production:
 
 **v0.2**
 
-- ~~**Fault localization**~~ — shipped. Precision 35.8% → 59.2%, grounded-accuracy
-  64.4% → 86.7%, recall unchanged at 100%. What is left is genuine ambiguity, which
+- ~~**Fault localization**~~ — shipped. Precision 35.8% → 57.8%, grounded-accuracy
+  64.4% → 90.2%, recall unchanged at 100%. What is left is genuine ambiguity, which
   needs *more invariants* per document rather than a smarter search.
 - **Real-document golden set** — labeled real (de-identified) documents alongside the
   synthetic suite, reported separately so the two are never conflated.
